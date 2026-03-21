@@ -14,7 +14,10 @@
     },
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.ntn.entertainment"
+      "bundleIdentifier": "com.ntn.entertainment",
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
+      }
     },
     "android": {
       "package": "com.ntn.entertainment",
@@ -46,7 +49,8 @@
         {
           "iosUrlScheme": "com.googleusercontent.apps.422000844327-42vnq39198pauu6dnecmuccl3kgl0sub"
         }
-      ]
+      ],
+      "expo-font"
     ]
   }
 }
