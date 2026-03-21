@@ -1,0 +1,60 @@
+workflows:
+  android-apk:
+    name: Build Android APK (Free)
+    instance_type: mac_mini_m1
+    environment:
+      node: 20
+    scripts:
+      - name: Install npm dependencies
+        script: npm install
+      - name: Generate Android project via Expo Prebuild
+        script: npx expo prebuild --platform android --clean
+      - name: Build Android Release APK
+        script: |
+          cd android
+          ./gradlew assembleRelease
+    artifacts:
+      - android/app/build/outputs/**/*.apk
+
+  ios-simulator:
+    name: Build iOS Simulator (Free/No Apple Dev Account)
+    instance_type: mac_mini_m1
+    environment:
+      node: 20
+    scripts:
+      - name: Install npm dependencies
+        script: npm install
+      - name: Generate iOS project via Expo Prebuild
+        script: npx expo prebuild --platform ios --clean
+      - name: Install CocoaPods
+        script: |
+          cd ios && pod install
+      - name: Build iOS Simulator App
+        script: |
+          xcodebuild -workspace ios/NTN.xcworkspace -scheme NTN -configuration Debug -sdk iphonesimulator -derivedDataPath ios/build
+    artifacts:
+      - ios/build/Build/Products/Debug-iphonesimulator/*.app
+
+  ios-production:
+    name: Build iOS Production IPA (Requires Apple Dev Account)
+    instance_type: mac_mini_m1
+    environment:
+      node: 20
+      groups:
+        - ios_credentials # You must configure this group in Codemagic's environment variables dashboard
+    scripts:
+      - name: Install npm dependencies
+        script: npm install
+      - name: Generate iOS project via Expo Prebuild
+        script: |
+          npx expo prebuild --platform ios --clean
+      - name: Install CocoaPods dependencies
+        script: |
+          cd ios && pod install
+      - name: Build IPA for distribution
+        script: |
+          xcode-project build-ipa \
+            --workspace "$CM_BUILD_DIR/ios/NTN.xcworkspace" \
+            --scheme "NTN"
+    artifacts:
+      - build/ios/ipa/*.ipa
