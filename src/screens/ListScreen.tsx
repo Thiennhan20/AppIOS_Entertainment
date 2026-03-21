@@ -1,8 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, FlatList, TouchableOpacity, Image, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, FlatList, TouchableOpacity, Image, ActivityIndicator, Vibration } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
+import { useTranslation } from 'react-i18next';
 import { tmdbApi } from '../api/tmdb';
+import FilterModal, { FilterState } from '../components/FilterModal';
+import LongPressMoviePopup from '../components/LongPressMoviePopup';
 
 export default function ListScreen({ route, navigation }: any) {
   const insets = useSafeAreaInsets();
@@ -13,21 +16,28 @@ export default function ListScreen({ route, navigation }: any) {
   const [loading, setLoading] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
 
+  const [filterVisible, setFilterVisible] = useState(false);
+  const [activeFilters, setActiveFilters] = useState<FilterState>({ genreId: 0, year: 0, country: '', type: 'all' });
+
+  const [longPressedMovie, setLongPressedMovie] = useState<any>(null);
+
   const isTV = type === 'tv';
   const title = isTV ? 'TV Shows' : 'Movies';
 
   useEffect(() => {
-    fetchData(1);
-  }, [type]);
+    setData([]);
+    setPage(1);
+    fetchData(1, activeFilters);
+  }, [type, activeFilters]);
 
-  const fetchData = async (pageNum: number) => {
+  const fetchData = async (pageNum: number, filters: { genreId: number, year: number, country: string }) => {
     if (pageNum === 1) setLoading(true);
     else setLoadingMore(true);
 
     try {
       const resp: any = isTV 
-        ? await tmdbApi.discoverTV(pageNum)
-        : await tmdbApi.discoverMovies(pageNum);
+        ? await tmdbApi.discoverTV(pageNum, filters)
+        : await tmdbApi.discoverMovies(pageNum, filters);
       
       const newItems = resp?.results?.map((i: any) => ({ ...i, media_type: isTV ? 'tv' : 'movie' })) || [];
       const validItems = newItems.filter((i: any) => i.poster_path);
@@ -49,7 +59,7 @@ export default function ListScreen({ route, navigation }: any) {
     if (!loading && !loadingMore) {
       setPage(prev => {
         const nextPage = prev + 1;
-        fetchData(nextPage);
+        fetchData(nextPage, activeFilters);
         return nextPage;
       });
     }
@@ -60,9 +70,15 @@ export default function ListScreen({ route, navigation }: any) {
       <TouchableOpacity 
         style={styles.card}
         onPress={() => navigation.navigate('DetailScreen', { item, isTV })}
+        onLongPress={() => {
+          Vibration.vibrate(40);
+          setLongPressedMovie({ ...item, isTV });
+        }}
+        delayLongPress={400}
+        activeOpacity={0.8}
       >
         <Image 
-          source={{ uri: `https://image.tmdb.org/t/p/w400${item.poster_path}` }} 
+          source={{ uri: `https://image.tmdb.org/t/p/w200${item.poster_path}` }} 
           style={styles.poster} 
         />
         <Text style={styles.cardTitle} numberOfLines={1}>{item.title || item.name}</Text>
@@ -77,7 +93,24 @@ export default function ListScreen({ route, navigation }: any) {
           <Ionicons name="arrow-back" size={24} color="white" />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>{title}</Text>
+        <TouchableOpacity 
+          style={styles.filterIconButton}
+          onPress={() => setFilterVisible(true)}
+        >
+          <Ionicons name="options-outline" size={24} color={(activeFilters.genreId > 0 || activeFilters.year > 0 || activeFilters.country !== '') ? '#E50914' : 'white'} />
+        </TouchableOpacity>
       </View>
+
+      <FilterModal 
+        visible={filterVisible}
+        onClose={() => setFilterVisible(false)}
+        filters={activeFilters}
+        onApply={(f) => {
+          setActiveFilters(f);
+          setFilterVisible(false);
+        }}
+        showTypeFilter={false}
+      />
 
       {loading ? (
         <View style={styles.loadingContainer}>
@@ -87,7 +120,12 @@ export default function ListScreen({ route, navigation }: any) {
         <FlatList
           data={data}
           keyExtractor={(item, index) => `${item.id}-${index}`}
-          numColumns={2}
+          numColumns={3}
+          initialNumToRender={30}
+          maxToRenderPerBatch={30}
+          windowSize={7}
+          removeClippedSubviews={true}
+          updateCellsBatchingPeriod={50}
           contentContainerStyle={styles.listContent}
           renderItem={renderItem}
           onEndReached={handleLoadMore}
@@ -101,6 +139,11 @@ export default function ListScreen({ route, navigation }: any) {
           }
         />
       )}
+
+      <LongPressMoviePopup 
+        movie={longPressedMovie} 
+        onClose={() => setLongPressedMovie(null)} 
+      />
     </View>
   );
 }
@@ -127,6 +170,7 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 20,
     fontWeight: 'bold',
+    flex: 1,
   },
   loadingContainer: {
     flex: 1,
@@ -134,28 +178,32 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   listContent: {
-    paddingHorizontal: 10,
+    paddingHorizontal: 8,
     paddingBottom: 20,
   },
   card: {
     flex: 1,
-    margin: 6,
-    maxWidth: '47%',
+    marginHorizontal: 4,
+    marginBottom: 20,
+    maxWidth: '31%',
   },
   poster: {
     width: '100%',
     aspectRatio: 2/3,
-    borderRadius: 8,
+    borderRadius: 6,
     resizeMode: 'cover',
   },
   cardTitle: {
-    color: '#ccc',
-    fontSize: 13,
-    marginTop: 6,
-    fontWeight: '500',
+    color: '#fff',
+    fontSize: 12,
+    marginTop: 4,
+    fontWeight: '600',
   },
   footerLoader: {
     paddingVertical: 20,
     alignItems: 'center',
+  },
+  filterIconButton: {
+    padding: 4,
   }
 });

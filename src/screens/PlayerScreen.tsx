@@ -4,12 +4,16 @@ import {
   ActivityIndicator, ScrollView, Modal, TextInput, KeyboardAvoidingView, Platform
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
+import { useTranslation } from 'react-i18next';
 import { useVideoPlayer, VideoView } from 'expo-video';
 import { WebView } from 'react-native-webview';
 
 import { phimApi } from '../api/phimapi';
 import { nguoncApi } from '../api/nguonc';
+import { useTheme } from '../context/ThemeContext';
+import CustomAlert from '../components/CustomAlert';
 
 const { width } = Dimensions.get('window');
 
@@ -17,6 +21,22 @@ function M3U8Player({ url }: { url: string }) {
   const player = useVideoPlayer(url, p => {
     p.play();
   });
+
+  useFocusEffect(
+    React.useCallback(() => {
+      // Screen is focused, we can let it play or resume if needed
+      // (The initializer above already plays it first time)
+      
+      return () => {
+        // Screen is unfocused or player unmounted. Safely pause if player still exists.
+        try {
+          player.pause();
+        } catch (e) {
+          // Ignore if the native player instance was already released
+        }
+      };
+    }, [player])
+  );
 
   return (
     <View style={styles.inlinePlayerContainer}>
@@ -45,7 +65,9 @@ function EmbedPlayerInline({ url }: { url: string }) {
 }
 
 export default function PlayerScreen({ route, navigation }: any) {
+  const { t } = useTranslation();
   const insets = useSafeAreaInsets();
+  const { themeColor } = useTheme();
   const { item, isTV } = route.params;
 
   const [activePlayer, setActivePlayer] = useState<'m3u8' | 'embed' | null>(null);
@@ -55,10 +77,14 @@ export default function PlayerScreen({ route, navigation }: any) {
   const [selectedServer, setSelectedServer] = useState<'Server 1' | 'Server 3'>('Server 1');
   const [showServerPicker, setShowServerPicker] = useState(false);
 
-  const [comments, setComments] = useState<any[]>([
-    { id: '1', user: 'Cuồng Phim', text: 'Cùng chung đam mê cày phim, server load nhanh đấy!' },
-    { id: '2', user: 'Hoa Phượng', text: 'VIBE đỉnh quá, chúc dự án thành công.' }
-  ]);
+  const [alertConfig, setAlertConfig] = useState<{ visible: boolean, message: string }>({ visible: false, message: '' });
+
+  // Audio track states
+  const [availableAudios, setAvailableAudios] = useState<{ id: string, name: string, url: string }[]>([]);
+  const [selectedAudioId, setSelectedAudioId] = useState<string | null>(null);
+  const [showAudioPicker, setShowAudioPicker] = useState(false);
+
+  const [comments, setComments] = useState<any[]>([]);
   const [newComment, setNewComment] = useState('');
 
   const title = item?.title || item?.name || 'Unknown Title';
@@ -66,7 +92,7 @@ export default function PlayerScreen({ route, navigation }: any) {
 
   useEffect(() => {
     handlePlay();
-  }, []);
+  }, [selectedServer]);
 
   const handlePlay = async () => {
     if (loadingStream) return;
@@ -77,29 +103,34 @@ export default function PlayerScreen({ route, navigation }: any) {
 
     try {
       if (selectedServer === 'Server 1') {
-        const m3u8 = await phimApi.getStreamingLink(item.id.toString(), title, parseInt(year));
-        if (m3u8) {
-          setStreamUrl(m3u8);
+        const audioList = await phimApi.getStreamingLink(item.id.toString(), title, parseInt(year));
+        if (audioList && audioList.length > 0) {
+          setAvailableAudios(audioList);
+          setSelectedAudioId(audioList[0].id);
+          setStreamUrl(audioList[0].url);
           setActivePlayer('m3u8');
         } else {
-          alert('Not available on Server 1 (PhimAPI). Try Server 3.');
+          setAlertConfig({ visible: true, message: t('player.stream_not_on_server_1') });
         }
       } else {
         const links = await nguoncApi.getStreamingLink(isTV, title, parseInt(year));
-        let validEmbed = links?.m3u8 || links?.vietsub || links?.dubbed;
         
-        if (validEmbed) {
-          if (validEmbed.startsWith('//')) {
-            validEmbed = 'https:' + validEmbed;
-          }
-          setStreamUrl(validEmbed);
-          setActivePlayer('embed');
+        let audios = [];
+        if (links?.vietsub) audios.push({ id: 'vietsub', name: 'Subtitled', url: links.vietsub.startsWith('//') ? 'https:' + links.vietsub : links.vietsub });
+        if (links?.dubbed) audios.push({ id: 'dubbed', name: 'Dubbed', url: links.dubbed.startsWith('//') ? 'https:' + links.dubbed : links.dubbed });
+        if (links?.m3u8) audios.push({ id: 'm3u8', name: 'Raw (M3U8)', url: links.m3u8.startsWith('//') ? 'https:' + links.m3u8 : links.m3u8 });
+
+        if (audios.length > 0) {
+          setAvailableAudios(audios);
+          setSelectedAudioId(audios[0].id);
+          setStreamUrl(audios[0].url);
+          setActivePlayer(audios[0].id === 'm3u8' ? 'm3u8' : 'embed');
         } else {
-          alert('Not available on Server 3 (NguonC). Try Server 1.');
+          setAlertConfig({ visible: true, message: t('player.stream_not_on_server_3') });
         }
       }
     } catch (e) {
-      alert("Error finding streams.");
+      setAlertConfig({ visible: true, message: t('player.error_loading_stream') });
     } finally {
       setLoadingStream(false);
     }
@@ -109,6 +140,24 @@ export default function PlayerScreen({ route, navigation }: any) {
     if (newComment.trim()) {
       setComments([...comments, { id: Date.now().toString(), user: 'You', text: newComment.trim() }]);
       setNewComment('');
+    }
+  };
+
+  const formatAudio = (name?: string, id?: string) => {
+    if (!name && !id) return '';
+    const lookup = (name || id || '').toLowerCase();
+    if (lookup.includes('vietsub')) return t('player.subtitled');
+    if (lookup.includes('thuyết minh') || lookup.includes('lồng tiếng') || lookup === 'dubbed') return t('player.dubbed');
+    return name || id || '';
+  };
+
+  const changeAudio = (audioId: string) => {
+    const target = availableAudios.find(a => a.id === audioId);
+    if (target) {
+       setSelectedAudioId(audioId);
+       setStreamUrl(target.url);
+       setShowAudioPicker(false);
+       setActivePlayer(audioId === 'm3u8' || target.url.includes('.m3u8') ? 'm3u8' : 'embed');
     }
   };
 
@@ -128,7 +177,7 @@ export default function PlayerScreen({ route, navigation }: any) {
         <View style={styles.playerWrapper}>
           {loadingStream ? (
             <View style={styles.loadingContainer}>
-              <ActivityIndicator size="large" color="#E50914" />
+              <ActivityIndicator size="large" color={themeColor} />
               <Text style={{color:'white', marginTop:10}}>Loading stream...</Text>
             </View>
           ) : activePlayer === 'm3u8' && streamUrl ? (
@@ -137,7 +186,7 @@ export default function PlayerScreen({ route, navigation }: any) {
             <EmbedPlayerInline url={streamUrl} />
           ) : (
             <View style={styles.loadingContainer}>
-              <Text style={{color:'gray'}}>Please select a server and press Play</Text>
+              <Text style={{color:'gray'}}>{t('player.please_select_server')}</Text>
             </View>
           )}
         </View>
@@ -145,27 +194,33 @@ export default function PlayerScreen({ route, navigation }: any) {
 
       <ScrollView style={{ flex: 1 }} keyboardShouldPersistTaps="handled">
         <View style={styles.controlsRow}>
+          {/* Play / Reload button removed to leave space for future Choose Audio dropdown */}
           <TouchableOpacity 
-            style={styles.playButtonFull}
-            onPress={handlePlay}
-            disabled={loadingStream}
-          >
-            <Ionicons name="play" size={20} color="black" />
-            <Text style={styles.playButtonText}>Play / Reload</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity 
-            style={styles.dropdownButton}
+            style={[styles.dropdownButton, { flex: 1, marginRight: 10 }]}
             onPress={() => setShowServerPicker(true)}
             disabled={loadingStream}
           >
-            <Text style={styles.dropdownText}>{selectedServer}</Text>
-            <Ionicons name="chevron-down" size={16} color="white" style={{marginLeft: 5}} />
+            <Ionicons name="server-outline" size={16} color="white" style={{ marginRight: 8 }} />
+            <Text style={[styles.dropdownText, { flex: 1 }]}>{t('player.change_server')} ({selectedServer})</Text>
+            <Ionicons name="chevron-down" size={16} color="white" />
+          </TouchableOpacity>
+
+          {/* Reserved space for Audio Dropdown - Can just put a placeholder here for layout reference */}
+          <TouchableOpacity 
+            style={[styles.dropdownButton, { flex: 1, opacity: availableAudios.length > 1 ? 1 : 0.5 }]}
+            onPress={() => setShowAudioPicker(true)}
+            disabled={loadingStream || availableAudios.length <= 1}
+          >
+            <Ionicons name="musical-notes-outline" size={16} color="white" style={{ marginRight: 8 }} />
+            <Text style={[styles.dropdownText, { flex: 1 }]} numberOfLines={1}>
+              {formatAudio(availableAudios.find(a => a.id === selectedAudioId)?.name || '', selectedAudioId || '') || t('player.language')}
+            </Text>
+            <Ionicons name="chevron-down" size={16} color="white" />
           </TouchableOpacity>
         </View>
 
         <View style={styles.commentsContainer}>
-          <Text style={styles.commentsHeader}>Comments</Text>
+          <Text style={styles.commentsHeader}>{t('player.comments')}</Text>
           {comments.map((c, i) => (
             <View key={i} style={styles.commentItem}>
               <View style={styles.commentAvatar}>
@@ -188,7 +243,7 @@ export default function PlayerScreen({ route, navigation }: any) {
           value={newComment}
           onChangeText={setNewComment}
         />
-        <TouchableOpacity style={styles.sendButton} onPress={addComment}>
+        <TouchableOpacity style={[styles.sendButton, { backgroundColor: themeColor }]} onPress={addComment}>
           <Ionicons name="send" size={20} color="white" />
         </TouchableOpacity>
       </View>
@@ -200,30 +255,70 @@ export default function PlayerScreen({ route, navigation }: any) {
           onPress={() => setShowServerPicker(false)}
         >
           <TouchableOpacity activeOpacity={1} style={styles.modalContent}>
-            <Text style={styles.modalTitle}>Select Streaming Server</Text>
+            <Text style={styles.modalTitle}>{t('player.select_server')}</Text>
             
             <TouchableOpacity 
-              style={[styles.serverOption, selectedServer === 'Server 1' && styles.serverOptionSelected]}
-              onPress={() => { setSelectedServer('Server 1'); setShowServerPicker(false); handlePlay(); }}
+              style={[styles.serverOption, selectedServer === 'Server 1' && { backgroundColor: `${themeColor}1A` }]}
+              onPress={() => { setSelectedServer('Server 1'); setShowServerPicker(false); }}
             >
-              <Text style={styles.serverOptionText}>📺 Server 1 (PhimAPI - M3U8)</Text>
-              {selectedServer === 'Server 1' && <Ionicons name="checkmark" size={20} color="#E50914" />}
+              <Text style={styles.serverOptionText}>{t('player.server_1')}</Text>
+              {selectedServer === 'Server 1' && <Ionicons name="checkmark" size={20} color={themeColor} />}
             </TouchableOpacity>
             
             <TouchableOpacity 
-              style={[styles.serverOption, selectedServer === 'Server 3' && styles.serverOptionSelected]}
-              onPress={() => { setSelectedServer('Server 3'); setShowServerPicker(false); handlePlay(); }}
+              style={[styles.serverOption, selectedServer === 'Server 3' && { backgroundColor: `${themeColor}1A` }]}
+              onPress={() => { setSelectedServer('Server 3'); setShowServerPicker(false); }}
             >
-              <Text style={styles.serverOptionText}>🚀 Server 3 (NguonC - Embed)</Text>
-              {selectedServer === 'Server 3' && <Ionicons name="checkmark" size={20} color="#E50914" />}
+              <Text style={styles.serverOptionText}>{t('player.server_3')}</Text>
+              {selectedServer === 'Server 3' && <Ionicons name="checkmark" size={20} color={themeColor} />}
             </TouchableOpacity>
 
             <TouchableOpacity style={{marginTop: 15, padding: 10}} onPress={() => setShowServerPicker(false)}>
-              <Text style={{color: 'gray', textAlign: 'center'}}>Cancel</Text>
+              <Text style={{color: 'gray', textAlign: 'center'}}>{t('player.close')}</Text>
             </TouchableOpacity>
           </TouchableOpacity>
         </TouchableOpacity>
       </Modal>
+
+      {/* Audio Picker Modal */}
+      <Modal visible={showAudioPicker} transparent animationType="fade">
+        <TouchableOpacity 
+          style={styles.modalOverlay} 
+          activeOpacity={1} 
+          onPress={() => setShowAudioPicker(false)}
+        >
+          <TouchableOpacity activeOpacity={1} style={styles.modalContent}>
+            <Text style={styles.modalTitle}>{t('player.select_audio_sub')}</Text>
+            
+            {availableAudios.map((audio) => (
+              <TouchableOpacity 
+                key={audio.id}
+                style={[styles.serverOption, selectedAudioId === audio.id && { backgroundColor: `${themeColor}1A` }]}
+                onPress={() => changeAudio(audio.id)}
+              >
+                <Text style={styles.serverOptionText}>
+                  {audio.id === 'vietsub' || audio.name.toLowerCase().includes('vietsub') ? '📝 ' : '🎙️ '}
+                  {formatAudio(audio.name, audio.id)}
+                </Text>
+                {selectedAudioId === audio.id && <Ionicons name="checkmark" size={20} color={themeColor} />}
+              </TouchableOpacity>
+            ))}
+
+            <TouchableOpacity style={{marginTop: 15, padding: 10}} onPress={() => setShowAudioPicker(false)}>
+              <Text style={{color: 'gray', textAlign: 'center'}}>{t('player.close')}</Text>
+            </TouchableOpacity>
+          </TouchableOpacity>
+        </TouchableOpacity>
+      </Modal>
+
+      <CustomAlert
+        visible={alertConfig.visible}
+        title="Failed to change Server"
+        message={alertConfig.message}
+        onClose={() => setAlertConfig({ ...alertConfig, visible: false })}
+        iconName="alert-circle-outline"
+        isError={true}
+      />
     </KeyboardAvoidingView>
   );
 }
@@ -387,9 +482,6 @@ const styles = StyleSheet.create({
     paddingVertical: 15,
     borderBottomWidth: 1,
     borderBottomColor: '#333',
-  },
-  serverOptionSelected: {
-    backgroundColor: 'rgba(229, 9, 20, 0.1)',
   },
   serverOptionText: {
     color: 'white',

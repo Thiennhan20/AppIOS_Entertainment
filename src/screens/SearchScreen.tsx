@@ -1,15 +1,23 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, TextInput, StyleSheet, FlatList, TouchableOpacity, Image, ActivityIndicator } from 'react-native';
+import { View, Text, TextInput, StyleSheet, FlatList, TouchableOpacity, Image, ActivityIndicator, Vibration } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
+import { useTranslation } from 'react-i18next';
 import { tmdbApi } from '../api/tmdb';
+import FilterModal, { FilterState } from '../components/FilterModal';
+import LongPressMoviePopup from '../components/LongPressMoviePopup';
 
 export default function SearchScreen({ navigation }: any) {
+  const { t } = useTranslation();
   const insets = useSafeAreaInsets();
   const [query, setQuery] = useState('');
   const [debouncedQuery, setDebouncedQuery] = useState('');
   const [results, setResults] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
+  const [longPressedMovie, setLongPressedMovie] = useState<any>(null);
+
+  const [filterVisible, setFilterVisible] = useState(false);
+  const [activeFilters, setActiveFilters] = useState<FilterState>({ genreId: 0, year: 0, country: '', type: 'all' });
 
   // Debounce input logic
   useEffect(() => {
@@ -21,7 +29,7 @@ export default function SearchScreen({ navigation }: any) {
 
   // Execute search when debouncedQuery changes
   useEffect(() => {
-    if (!debouncedQuery.trim()) {
+    if (!debouncedQuery.trim() && activeFilters.genreId === 0 && activeFilters.year === 0 && activeFilters.country === '') {
       setResults([]);
       return;
     }
@@ -29,15 +37,51 @@ export default function SearchScreen({ navigation }: any) {
     const fetchSearchResults = async () => {
       setLoading(true);
       try {
-        const [movies, tv] = await Promise.all([
-          tmdbApi.searchMovies(debouncedQuery),
-          tmdbApi.searchTV(debouncedQuery)
-        ]);
-
-        const mData = (movies as any)?.results?.map((i: any) => ({ ...i, media_type: 'movie' })) || [];
-        const tData = (tv as any)?.results?.map((i: any) => ({ ...i, media_type: 'tv' })) || [];
+        let mData: any[] = [];
+        let tData: any[] = [];
         
-        setResults([...mData, ...tData].filter(i => i.poster_path)); // Must have poster
+        if (debouncedQuery.trim()) {
+          const promises = [];
+          if (activeFilters.type === 'all' || activeFilters.type === 'movie') promises.push(tmdbApi.searchMovies(debouncedQuery));
+          else promises.push(Promise.resolve({ results: [] }));
+          
+          if (activeFilters.type === 'all' || activeFilters.type === 'tv') promises.push(tmdbApi.searchTV(debouncedQuery));
+          else promises.push(Promise.resolve({ results: [] }));
+
+          const [movies, tv] = await Promise.all(promises);
+          mData = (movies as any)?.results?.map((i: any) => ({ ...i, media_type: 'movie' })) || [];
+          tData = (tv as any)?.results?.map((i: any) => ({ ...i, media_type: 'tv' })) || [];
+        } else {
+          // No query, use discover API based on filters
+          const promises = [];
+          if (activeFilters.type === 'all' || activeFilters.type === 'movie') promises.push(tmdbApi.discoverMovies(1, activeFilters));
+          else promises.push(Promise.resolve({ results: [] }));
+          
+          if (activeFilters.type === 'all' || activeFilters.type === 'tv') promises.push(tmdbApi.discoverTV(1, activeFilters));
+          else promises.push(Promise.resolve({ results: [] }));
+
+          const [movies, tv] = await Promise.all(promises);
+          mData = (movies as any)?.results?.map((i: any) => ({ ...i, media_type: 'movie' })) || [];
+          tData = (tv as any)?.results?.map((i: any) => ({ ...i, media_type: 'tv' })) || [];
+        }
+
+        let mixed = [...mData, ...tData].filter(i => i.poster_path);
+
+        // Local filtering if both text and filters exists
+        if (debouncedQuery.trim()) {
+          if (activeFilters.genreId > 0) mixed = mixed.filter(i => i.genre_ids?.includes(activeFilters.genreId));
+          if (activeFilters.year > 0) {
+            mixed = mixed.filter(i => {
+              const yearStr = i.release_date || i.first_air_date || '';
+              return yearStr.startsWith(activeFilters.year.toString());
+            });
+          }
+          if (activeFilters.country) {
+            mixed = mixed.filter(i => i.origin_country?.includes(activeFilters.country));
+          }
+        }
+        
+        setResults(mixed);
       } catch (err) {
         console.warn(err);
       } finally {
@@ -46,7 +90,7 @@ export default function SearchScreen({ navigation }: any) {
     };
 
     fetchSearchResults();
-  }, [debouncedQuery]);
+  }, [debouncedQuery, activeFilters]);
 
   const renderItem = ({ item }: { item: any }) => {
     const isTV = item.media_type === 'tv';
@@ -54,9 +98,15 @@ export default function SearchScreen({ navigation }: any) {
       <TouchableOpacity 
         style={styles.card}
         onPress={() => navigation.navigate('DetailScreen', { item, isTV })}
+        onLongPress={() => {
+          Vibration.vibrate(40);
+          setLongPressedMovie({ ...item, isTV });
+        }}
+        delayLongPress={400}
+        activeOpacity={0.8}
       >
         <Image 
-          source={{ uri: `https://image.tmdb.org/t/p/w400${item.poster_path}` }} 
+          source={{ uri: `https://image.tmdb.org/t/p/w200${item.poster_path}` }} 
           style={styles.poster} 
         />
         <Text style={styles.cardTitle} numberOfLines={1}>{item.title || item.name}</Text>
@@ -74,15 +124,32 @@ export default function SearchScreen({ navigation }: any) {
           <Ionicons name="search" size={20} color="#777" style={styles.searchIcon} />
           <TextInput
             style={styles.searchInput}
-            placeholder="Tìm kiếm phim, series..."
+            placeholder={t('search.search_movies_series')}
             placeholderTextColor="#777"
-            autoFocus
+            autoFocus={false}
             clearButtonMode="while-editing"
             value={query}
             onChangeText={setQuery}
           />
         </View>
+        <TouchableOpacity 
+          style={styles.filterIconButton}
+          onPress={() => setFilterVisible(true)}
+        >
+          <Ionicons name="options-outline" size={26} color={(activeFilters.genreId > 0 || activeFilters.year > 0 || activeFilters.country !== '' || activeFilters.type !== 'all') ? '#E50914' : 'white'} />
+        </TouchableOpacity>
       </View>
+
+      <FilterModal 
+        visible={filterVisible}
+        onClose={() => setFilterVisible(false)}
+        filters={activeFilters}
+        onApply={(f) => {
+          setActiveFilters(f);
+          setFilterVisible(false);
+        }}
+        showTypeFilter={true}
+      />
 
       {loading ? (
         <View style={styles.loadingContainer}>
@@ -92,22 +159,31 @@ export default function SearchScreen({ navigation }: any) {
         <FlatList
           data={results}
           keyExtractor={(item, index) => `${item.id}-${index}`}
-          numColumns={2}
+          numColumns={3}
           contentContainerStyle={styles.listContent}
           renderItem={renderItem}
+          initialNumToRender={24}
+          maxToRenderPerBatch={24}
+          windowSize={5}
+          removeClippedSubviews={true}
           keyboardShouldPersistTaps="handled"
         />
-      ) : debouncedQuery.length > 0 ? (
+      ) : (debouncedQuery.length > 0 || activeFilters.genreId > 0 || activeFilters.year > 0 || activeFilters.country !== '') ? (
         <View style={styles.emptyContainer}>
           <Ionicons name="sad-outline" size={60} color="#444" />
-          <Text style={styles.emptyText}>Không tìm thấy phim phù hợp</Text>
+          <Text style={styles.emptyText}>{t('search.no_movies_found')}</Text>
         </View>
       ) : (
         <View style={styles.emptyContainer}>
           <Ionicons name="film-outline" size={60} color="#444" />
-          <Text style={styles.emptyText}>Nhập tên phim bạn muốn tìm</Text>
+          <Text style={styles.emptyText}>{t('search.enter_name_to_search')}</Text>
         </View>
       )}
+
+      <LongPressMoviePopup 
+        movie={longPressedMovie} 
+        onClose={() => setLongPressedMovie(null)} 
+      />
     </View>
   );
 }
@@ -149,25 +225,26 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   listContent: {
-    paddingHorizontal: 10,
+    paddingHorizontal: 8,
     paddingBottom: 20,
   },
   card: {
     flex: 1,
-    margin: 5,
-    maxWidth: '47%',
+    marginHorizontal: 4,
+    marginBottom: 20,
+    maxWidth: '31%',
   },
   poster: {
     width: '100%',
     aspectRatio: 2/3,
-    borderRadius: 8,
+    borderRadius: 6,
     resizeMode: 'cover',
   },
   cardTitle: {
-    color: '#ccc',
-    fontSize: 13,
-    marginTop: 6,
-    fontWeight: '500',
+    color: '#fff',
+    fontSize: 12,
+    marginTop: 4,
+    fontWeight: '600',
   },
   emptyContainer: {
     flex: 1,
@@ -178,5 +255,8 @@ const styles = StyleSheet.create({
     color: '#666',
     marginTop: 15,
     fontSize: 16,
+  },
+  filterIconButton: {
+    paddingLeft: 12,
   }
 });

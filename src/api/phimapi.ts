@@ -1,5 +1,6 @@
 import axios from 'axios';
 import { CONFIG } from '../constants/config';
+import { useTranslation } from 'react-i18next';
 
 const apiClient = axios.create({
   baseURL: `${CONFIG.API_BASE_URL}/api/server1`,
@@ -101,7 +102,7 @@ function findBestMatch(items: any[], targetTitle: string, targetYear: number, tm
 }
 
 export const phimApi = {
-  async getStreamingLink(tmdbId: string, title: string, year: number): Promise<string | null> {
+  async getStreamingLink(tmdbId: string, title: string, year: number): Promise<{ id: string, name: string, url: string }[] | null> {
     try {
       let slug = null;
 
@@ -133,22 +134,27 @@ export const phimApi = {
       // 3. Get Details to extract the valid M3U8 link
       const detailData: any = await apiClient.get(`/detail/${slug}`);
       
-      let m3u8Link = '';
+      let results: { id: string, name: string, url: string }[] = [];
 
       if (detailData.episodes && detailData.episodes.length > 0) {
-        // Just extract the first available link for simplicity.
-        const firstEpisode = detailData.episodes[0];
-        if (firstEpisode.server_data && firstEpisode.server_data.length > 0) {
-           // PhimAPI usually gives link_m3u8
-           m3u8Link = firstEpisode.server_data[0].link_m3u8; 
-        }
+        detailData.episodes.forEach((ep: any, index: number) => {
+          if (ep.server_data && ep.server_data.length > 0) {
+            let m3u8Link = ep.server_data[0].link_m3u8;
+            if (m3u8Link && m3u8Link.includes('?url=')) {
+              m3u8Link = m3u8Link.split('?url=')[1];
+            }
+            if (m3u8Link) {
+              results.push({
+                id: `phimapi_${index}`,
+                name: ep.server_name || `Server 1 - ${index + 1}`,
+                url: m3u8Link
+              });
+            }
+          }
+        });
       }
 
-      if (m3u8Link && m3u8Link.includes('?url=')) {
-        return m3u8Link.split('?url=')[1];
-      }
-      
-      return m3u8Link || null;
+      return results.length > 0 ? results : null;
     } catch (e) {
       console.warn("Failed fetching from PhimAPI", e);
       return null;

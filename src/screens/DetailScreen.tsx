@@ -1,34 +1,64 @@
 import React, { useState, useEffect } from 'react';
 import { 
-  StyleSheet, Text, View, Image, ScrollView, 
-  TouchableOpacity, Dimensions, ActivityIndicator
+  StyleSheet, Text, View, Image, ScrollView, FlatList,
+  TouchableOpacity, Dimensions, ActivityIndicator, Modal
 } from 'react-native';
+import YoutubePlayer from 'react-native-youtube-iframe';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
+import { useTranslation } from 'react-i18next';
 
 import { tmdbApi } from '../api/tmdb';
-import { claudeApi } from '../api/claude';
+import { chatAIApi } from '../api/chatAI';
+import { authApi } from '../api/authApi';
+import { useTheme } from '../context/ThemeContext';
+import WatchlistButton from '../components/WatchlistButton';
 
 const { width, height } = Dimensions.get('window');
 
 export default function DetailScreen({ route, navigation }: any) {
+  const { t } = useTranslation();
+  const { themeColor } = useTheme();
   const { item, isTV } = route.params;
   const [details, setDetails] = useState<any>(null);
+  const [cast, setCast] = useState<any[]>([]);
+  const [similar, setSimilar] = useState<any[]>([]);
   
   // AI State
   const [aiSummary, setAiSummary] = useState<string | null>(null);
   const [loadingAi, setLoadingAi] = useState(false);
 
+  const [trailerKey, setTrailerKey] = useState<string | null>(null);
+  const [showTrailer, setShowTrailer] = useState(false);
+
   useEffect(() => {
     const fetchDetails = async () => {
       try {
-        let res;
+        let res, credits, sim, videos;
         if (isTV) {
-          res = await tmdbApi.getTVDetail(item.id);
+          [res, credits, sim, videos] = await Promise.all([
+            tmdbApi.getTVDetail(item.id),
+            tmdbApi.getTVCredits(item.id),
+            tmdbApi.getSimilarTV(item.id),
+            tmdbApi.getTVVideos(item.id)
+          ]);
         } else {
-          res = await tmdbApi.getMovieDetail(item.id);
+          [res, credits, sim, videos] = await Promise.all([
+            tmdbApi.getMovieDetail(item.id),
+            tmdbApi.getMovieCredits(item.id),
+            tmdbApi.getSimilarMovies(item.id),
+            tmdbApi.getMovieVideos(item.id)
+          ]);
         }
         setDetails(res);
+        setCast((credits as any)?.cast || []);
+        setSimilar((sim as any)?.results?.filter((i:any) => i.poster_path) || []);
+        
+        const vidList = (videos as any)?.results || [];
+        const ytTrailer = vidList.find((v: any) => v.type === 'Trailer' && v.site === 'YouTube');
+        if (ytTrailer) {
+          setTrailerKey(ytTrailer.key);
+        }
       } catch (error) {
         console.warn("Failed fetching metadata");
       }
@@ -69,22 +99,39 @@ export default function DetailScreen({ route, navigation }: any) {
           <Text style={styles.title}>{title}</Text>
           
           <View style={styles.metaRow}>
-            <Text style={styles.matchText}>98% Match</Text>
+            <Text style={styles.matchText}>98% {t('general.match', { defaultValue: 'Match' })}</Text>
             <Text style={styles.metaText}>{details?.release_date?.substring(0,4) || details?.first_air_date?.substring(0,4)}</Text>
             <Text style={styles.ageRating}>16+</Text>
-            <Text style={styles.metaText}>{details?.runtime ? `${details.runtime}m` : '1 Season'}</Text>
+            <Text style={styles.metaText}>{details?.runtime ? `${details.runtime}m` : `1 ${t('general.season')}`}</Text>
           </View>
 
-          {/* Player controls */}
+          {/* Player controls and quick actions */}
           <View style={styles.playControlsRow}>
-            {/* Play Button */}
             <TouchableOpacity 
-              style={[styles.playButtonFull, { flex: 1, marginRight: 0 }]}
+              style={[styles.playButtonFull, { backgroundColor: themeColor }]}
               onPress={handlePlay}
             >
-              <Ionicons name="play" size={24} color="black" />
-              <Text style={styles.playButtonText}>Start Watching</Text>
+              <Ionicons name="play" size={20} color="white" />
+              <Text style={[styles.playButtonText, { color: 'white' }]}>{t('general.play_now')}</Text>
             </TouchableOpacity>
+
+            <View style={styles.actionRowMini}>
+              {trailerKey && (
+                <TouchableOpacity style={styles.actionItemMini} onPress={() => setShowTrailer(true)}>
+                  <Ionicons name="film-outline" size={24} color="gray" />
+                  <Text style={styles.actionItemTextMini}>{t('home.trailer')}</Text>
+                </TouchableOpacity>
+              )}
+              <WatchlistButton movie={{ ...item, isTV }} styleType="detail" />
+              <TouchableOpacity style={styles.actionItemMini}>
+                <Ionicons name="thumbs-up-outline" size={24} color="white" />
+                <Text style={styles.actionItemTextMini}>{t('general.like')}</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.actionItemMini}>
+                <Ionicons name="share-social-outline" size={24} color="white" />
+                <Text style={styles.actionItemTextMini}>{t('general.share')}</Text>
+              </TouchableOpacity>
+            </View>
           </View>
 
           {/* AI Features */}
@@ -95,19 +142,19 @@ export default function DetailScreen({ route, navigation }: any) {
                 if (aiSummary) return;
                 setLoadingAi(true);
                 try {
-                  const sum = await claudeApi.summarizeMovie(
+                  const sum = await chatAIApi.summarizeMovie(
                     title, overview, parseInt(year)
                   );
                   setAiSummary(sum);
                 } catch {
-                  setAiSummary("Xin lỗi, tôi không thể tóm tắt lúc này.");
+                  setAiSummary(t('ai.busy'));
                 }
                 setLoadingAi(false);
               }}
             >
               <Ionicons name="sparkles" size={16} color="#f59e0b" style={{marginRight: 6}} />
               <Text style={{color: '#f59e0b', fontWeight: 'bold'}}>
-                {loadingAi ? "Đang tóm tắt..." : "VIBE AI Tóm tắt"}
+                {loadingAi ? t('ai.summarizing') : t('ai.ai_hub_summary')}
               </Text>
             </TouchableOpacity>
             
@@ -119,34 +166,105 @@ export default function DetailScreen({ route, navigation }: any) {
               style={styles.aiRecommendButton}
               onPress={() => navigation.navigate('AI')}
             >
-              <Text style={{color: '#3b82f6'}}>Xem thêm phim tương tự với AI ➔</Text>
+              <Text style={{color: '#3b82f6'}}>{t('ai.similar_movies_ai')}</Text>
             </TouchableOpacity>
           </View>
 
           <Text style={styles.overview}>{overview}</Text>
           
-          <Text style={styles.castText}>
-            <Text style={{color: 'gray'}}>Genres: </Text>
-            {details?.genres?.map((g: any) => g.name).join(', ')}
-          </Text>
 
-          {/* Action Row */}
-          <View style={styles.actionRow}>
-            <TouchableOpacity style={styles.actionItem}>
-              <Ionicons name="add" size={28} color="white" />
-              <Text style={styles.actionItemText}>My List</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.actionItem}>
-              <Ionicons name="thumbs-up-outline" size={28} color="white" />
-              <Text style={styles.actionItemText}>Rate</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.actionItem}>
-              <Ionicons name="share-social-outline" size={28} color="white" />
-              <Text style={styles.actionItemText}>Share</Text>
-            </TouchableOpacity>
-          </View>
+
+          {/* Cast List */}
+          {cast.length > 0 && (
+            <View style={styles.sectionContainer}>
+              <Text style={styles.sectionTitle}>{t('general.cast')}</Text>
+              <FlatList
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={styles.horizontalList}
+                data={cast.slice(0, 15)}
+                keyExtractor={(item, idx) => `cast-${item.id}-${idx}`}
+                initialNumToRender={5}
+                maxToRenderPerBatch={5}
+                windowSize={3}
+                renderItem={({ item }) => (
+                  <View style={styles.castItem}>
+                    <Image 
+                      source={{ uri: item.profile_path ? `https://image.tmdb.org/t/p/w200${item.profile_path}` : 'https://via.placeholder.com/200x300?text=NTN' }} 
+                      style={styles.castImage} 
+                    />
+                    <Text style={styles.castName} numberOfLines={1}>{item.name}</Text>
+                    <Text style={styles.castRole} numberOfLines={1}>{item.character}</Text>
+                  </View>
+                )}
+              />
+            </View>
+          )}
+
+          {/* Similar Movies */}
+          {similar.length > 0 && (
+            <View style={styles.sectionContainer}>
+              <Text style={styles.sectionTitle}>{t('ai.similar_overview')}</Text>
+              <FlatList
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={styles.horizontalList}
+                data={similar.slice(0, 10)}
+                keyExtractor={(item, idx) => `sim-${item.id}-${idx}`}
+                initialNumToRender={4}
+                maxToRenderPerBatch={4}
+                windowSize={3}
+                renderItem={({ item }) => (
+                  <TouchableOpacity 
+                    style={styles.similarItem}
+                    onPress={() => navigation.push('DetailScreen', { item, isTV })}
+                  >
+                    <Image 
+                      source={{ uri: `https://image.tmdb.org/t/p/w200${item.poster_path}` }} 
+                      style={styles.similarPoster} 
+                    />
+                  </TouchableOpacity>
+                )}
+              />
+            </View>
+          )}
+          
+          <View style={{height: 40}} />
         </View>
       </ScrollView>
+
+      {/* Trailer Modal (như trên web) */}
+      <Modal visible={showTrailer} transparent animationType="fade" statusBarTranslucent onRequestClose={() => setShowTrailer(false)}>
+        {showTrailer && (
+          <View style={styles.trailerOverlay}>
+            <TouchableOpacity style={StyleSheet.absoluteFillObject} onPress={() => setShowTrailer(false)} />
+            <View style={styles.trailerBox}>
+               <View style={styles.trailerHeader}>
+                  <Text style={styles.trailerTitle}>{t('home.trailer')}</Text>
+                  <TouchableOpacity onPress={() => setShowTrailer(false)}>
+                    <Ionicons name="close" size={24} color="white" />
+                  </TouchableOpacity>
+               </View>
+               {trailerKey && (
+                 <View style={{ backgroundColor: '#000' }}>
+                   <YoutubePlayer
+                     height={Math.round((width * 0.9) * (9/16))}
+                     width={Math.round(width * 0.9)}
+                     play={true}
+                     videoId={trailerKey}
+                     initialPlayerParams={{
+                       rel: false,
+                       modestbranding: true,
+                       preventFullScreen: true,
+                     }}
+                   />
+                 </View>
+               )}
+            </View>
+          </View>
+        )}
+      </Modal>
+
     </View>
   );
 }
@@ -206,35 +324,38 @@ const styles = StyleSheet.create({
   },
   playControlsRow: {
     flexDirection: 'row',
-    marginBottom: 15,
+    marginBottom: 20,
     alignItems: 'center',
+    justifyContent: 'space-between',
   },
   playButtonFull: {
     backgroundColor: 'white',
     flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
-    paddingVertical: 12,
-    borderRadius: 4,
+    paddingVertical: 10,
+    borderRadius: 6,
+    flex: 1,
+    marginRight: 20,
   },
   playButtonText: {
     color: 'black',
-    fontSize: 16,
-    fontWeight: 'bold',
-    marginLeft: 8,
-  },
-  dropdownButton: {
-    backgroundColor: '#262626',
-    flexDirection: 'row',
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingVertical: 12,
-    paddingHorizontal: 15,
-    borderRadius: 4,
-  },
-  dropdownText: {
-    color: 'white',
     fontSize: 15,
+    fontWeight: 'bold',
+    marginLeft: 6,
+  },
+  actionRowMini: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  actionItemMini: {
+    alignItems: 'center',
+    marginLeft: 15,
+  },
+  actionItemTextMini: {
+    color: 'gray',
+    fontSize: 10,
+    marginTop: 4,
     fontWeight: '500',
   },
   overview: {
@@ -242,18 +363,6 @@ const styles = StyleSheet.create({
     lineHeight: 22,
     marginBottom: 15,
   },
-  castText: {
-    color: 'white',
-    fontSize: 13,
-    marginBottom: 20,
-  },
-  actionRow: {
-    flexDirection: 'row',
-    marginTop: 10,
-    marginBottom: 50,
-  },
-  actionItem: { alignItems: 'center', marginRight: 40 },
-  actionItemText: { color: 'gray', fontSize: 12, marginTop: 8 },
 
   // AI Styles
   aiBox: {
@@ -280,7 +389,36 @@ const styles = StyleSheet.create({
     alignSelf: 'flex-start',
   },
   
-  // Modal styles
+  // Trailer Modal styles
+  trailerOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.85)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  trailerBox: {
+    width: '90%',
+    backgroundColor: '#000',
+    borderRadius: 8,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.1)',
+  },
+  trailerHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    padding: 8,
+    paddingHorizontal: 15,
+    backgroundColor: '#111',
+    alignItems: 'center',
+  },
+  trailerTitle: {
+    color: 'white',
+    fontWeight: 'bold',
+    fontSize: 14,
+  },
+  
+  // Existing Modal styles
   modalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0,0,0,0.7)',
@@ -313,5 +451,54 @@ const styles = StyleSheet.create({
   serverOptionText: {
     color: 'white',
     fontSize: 16,
+  },
+  sectionContainer: {
+    marginTop: 10,
+    marginBottom: 20,
+  },
+  sectionTitle: {
+    color: '#fff',
+    fontSize: 18,
+    fontWeight: 'bold',
+    marginBottom: 15,
+  },
+  horizontalList: {
+    paddingRight: 15,
+  },
+  castItem: {
+    width: 90,
+    marginRight: 15,
+    alignItems: 'center',
+  },
+  castImage: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    marginBottom: 8,
+    resizeMode: 'cover',
+    borderWidth: 1,
+    borderColor: '#333',
+  },
+  castName: {
+    color: '#fff',
+    fontSize: 13,
+    fontWeight: '600',
+    textAlign: 'center',
+  },
+  castRole: {
+    color: '#aaa',
+    fontSize: 11,
+    textAlign: 'center',
+    marginTop: 2,
+  },
+  similarItem: {
+    width: 120,
+    marginRight: 12,
+  },
+  similarPoster: {
+    width: 120,
+    height: 180,
+    borderRadius: 8,
+    resizeMode: 'cover',
   }
 });

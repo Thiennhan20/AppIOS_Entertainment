@@ -6,16 +6,20 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Ionicons } from '@expo/vector-icons';
-import { claudeApi } from '../api/claude';
+import { useTranslation } from 'react-i18next';
+import { chatAIApi } from '../api/chatAI';
+import { useTheme } from '../context/ThemeContext';
 
 export default function AIScreen() {
+  const { t } = useTranslation();
   const insets = useSafeAreaInsets();
+  const { themeColor } = useTheme();
   const [messages, setMessages] = useState<{ role: string, content: string }[]>([]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const flatListRef = useRef<FlatList>(null);
 
-  const QUICK_REPLIES = ["Gợi ý phim hôm nay", "Phim kinh dị hay nhất", "Series đang hot", "Phim Việt Nam"];
+  const QUICK_REPLIES = ["t('ai.movie_suggestions_today')", "t('ai.best_horror')", "t('ai.trending_series')", "t('ai.vn_movies')"];
 
   useEffect(() => {
     loadHistory();
@@ -32,7 +36,7 @@ export default function AIScreen() {
       const hist = await AsyncStorage.getItem('@ai_chat_history');
       if (hist) setMessages(JSON.parse(hist));
       else {
-        setMessages([{ role: 'assistant', content: 'Chào bạn, mình là VIBE AI ✨. Bạn muốn tìm phim gì hôm nay?' }]);
+        setMessages([{ role: 'assistant', content: t('ai.hi_ai') }]);
       }
     } catch {}
   };
@@ -49,11 +53,11 @@ export default function AIScreen() {
 
     try {
       // AI response
-      const reply = await claudeApi.chat(newMsgs);
+      const reply = await chatAIApi.chat(newMsgs);
       setMessages([...newMsgs, { role: 'assistant', content: reply }]);
       setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 100);
     } catch (e) {
-      setMessages([...newMsgs, { role: 'assistant', content: 'Xin lỗi, tôi đang bận xíu. Vui lòng thử lại sau.' }]);
+      setMessages([...newMsgs, { role: 'assistant', content: t('ai.busy') }]);
     } finally {
       setIsLoading(false);
     }
@@ -61,7 +65,7 @@ export default function AIScreen() {
 
   const clearHistory = async () => {
     await AsyncStorage.removeItem('@ai_chat_history');
-    setMessages([{ role: 'assistant', content: 'Lịch sử đã xóa. Bạn muốn xem gì?' }]);
+    setMessages([{ role: 'assistant', content: t('ai.history_cleared') }]);
   };
 
   const renderBubble = ({ item }: { item: any }) => {
@@ -69,7 +73,7 @@ export default function AIScreen() {
     return (
       <View style={[styles.bubbleWrapper, isUser ? styles.bubbleUser : styles.bubbleAI]}>
         {!isUser && <View style={styles.aiAvatar}><Text style={{fontSize: 16}}>🤖</Text></View>}
-        <View style={[styles.bubble, isUser ? styles.bubbleBgUser : styles.bubbleBgAI]}>
+        <View style={[styles.bubble, isUser ? [styles.bubbleBgUser, { backgroundColor: themeColor }] : styles.bubbleBgAI]}>
           <Text style={styles.bubbleText}>{item.content}</Text>
         </View>
       </View>
@@ -79,7 +83,7 @@ export default function AIScreen() {
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>VIBE AI ✨</Text>
+        <Text style={styles.headerTitle}>AI Hub ✨</Text>
         <TouchableOpacity onPress={clearHistory}>
           <Ionicons name="trash-outline" size={20} color="#666" />
         </TouchableOpacity>
@@ -96,8 +100,8 @@ export default function AIScreen() {
 
       {isLoading && (
         <View style={styles.typingIndicator}>
-          <ActivityIndicator color={'#3b82f6'} />
-          <Text style={{color: '#9ca3af', marginLeft: 10}}>AI đang nghĩ...</Text>
+          <ActivityIndicator color={themeColor} />
+          <Text style={{color: '#9ca3af', marginLeft: 10}}>{t('ai.thinking')}</Text>
         </View>
       )}
 
@@ -105,8 +109,8 @@ export default function AIScreen() {
       <View style={{height: 50}}>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.quickRepliesContent}>
           {QUICK_REPLIES.map((text, i) => (
-            <TouchableOpacity key={i} style={styles.chip} onPress={() => handleSend(text)}>
-              <Text style={styles.chipText}>{text}</Text>
+            <TouchableOpacity key={i} style={[styles.chip, { borderColor: themeColor, backgroundColor: `${themeColor}1A` }]} onPress={() => handleSend(text)}>
+              <Text style={[styles.chipText, { color: themeColor }]}>{text}</Text>
             </TouchableOpacity>
           ))}
         </ScrollView>
@@ -115,12 +119,12 @@ export default function AIScreen() {
       <View style={[styles.inputContainer, { paddingBottom: Math.max(insets.bottom, 10) }]}>
         <TextInput
           style={styles.input}
-          placeholder="Hỏi về phim, diễn viên..."
+          placeholder={t('ai.ask_movies_actors')}
           placeholderTextColor="#777"
           value={input}
           onChangeText={setInput}
         />
-        <TouchableOpacity style={styles.sendButton} onPress={() => handleSend(input)}>
+        <TouchableOpacity style={[styles.sendButton, { backgroundColor: themeColor }]} onPress={() => handleSend(input)}>
           <Ionicons name="send" size={20} color="white" />
         </TouchableOpacity>
       </View>

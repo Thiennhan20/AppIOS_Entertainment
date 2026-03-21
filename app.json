@@ -1,7 +1,8 @@
 {
   "expo": {
-    "name": "app_ios",
-    "slug": "app_ios",
+    "name": "NTN",
+    "slug": "ntnmovie",
+    "scheme": "ntnmovie",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
@@ -12,9 +13,11 @@
       "backgroundColor": "#ffffff"
     },
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.ntn.entertainment"
     },
     "android": {
+      "package": "com.ntn.entertainment",
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
         "foregroundImage": "./assets/android-icon-foreground.png",
@@ -25,6 +28,25 @@
     },
     "web": {
       "favicon": "./assets/favicon.png"
-    }
+    },
+    "extra": {
+      "eas": {
+        "projectId": "f88f7920-d54d-4f69-b06f-f97afbddf527"
+      }
+    },
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/f88f7920-d54d-4f69-b06f-f97afbddf527"
+    },
+    "plugins": [
+      [
+        "@react-native-google-signin/google-signin",
+        {
+          "iosUrlScheme": "com.googleusercontent.apps.422000844327-42vnq39198pauu6dnecmuccl3kgl0sub"
+        }
+      ]
+    ]
   }
 }

@@ -1,5 +1,6 @@
 export const CONFIG = {
-  API_BASE_URL: process.env.EXPO_PUBLIC_API_BASE_URL || 'https://server-nextjs-firm.onrender.com',
-  TMDB_PUBLIC_API_KEY: process.env.EXPO_PUBLIC_TMDB_API_KEY || '',
-  ANTHROPIC_API_KEY: process.env.EXPO_PUBLIC_ANTHROPIC_API_KEY || '',
+  API_BASE_URL: process.env.EXPO_PUBLIC_API_BASE_URL || 'http://192.168.124.5:3001',
+  GOOGLE_CLIENT_ID_WEB: process.env.EXPO_PUBLIC_GOOGLE_CLIENT_ID_WEB || '',
+  GOOGLE_CLIENT_ID_IOS: process.env.EXPO_PUBLIC_GOOGLE_CLIENT_ID_IOS || '',
+  GOOGLE_CLIENT_ID_ANDROID: process.env.EXPO_PUBLIC_GOOGLE_CLIENT_ID_ANDROID || '',
 };
