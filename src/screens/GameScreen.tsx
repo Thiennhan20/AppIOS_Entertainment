@@ -58,7 +58,7 @@ export default function GameScreen() {
         setCurrentMovie(shuffled[0]);
       }
     } catch {
-      Alert.alert('Error', t('game.failed_load_data'));
+      Alert.alert(t('general.error'), t('game.failed_load_data'));
     } finally {
       setLoading(false);
     }
@@ -87,7 +87,7 @@ export default function GameScreen() {
     } else {
       setHintsUsed(h => h + 1);
       if (hintsUsed >= 2) {
-        Alert.alert(t('game.wrong') + ' 😢', `The answer is: ${currentMovie?.title || currentMovie?.name}`, [{ text: t('game.try_another_movie'), onPress: nextMovie }]);
+        Alert.alert(t('game.wrong') + ' 😢', `${t('game.answer_is')} ${currentMovie?.title || currentMovie?.name}`, [{ text: t('game.try_another_movie'), onPress: nextMovie }]);
       } else {
         Alert.alert(t('game.wrong'), t('game.try_again_hint'));
       }
@@ -129,11 +129,11 @@ export default function GameScreen() {
         {/* Hints */}
         <View style={styles.hintsBox}>
           <Text style={styles.hintText}>
-            💡 Hint 1: Released in {currentMovie.release_date?.substring(0,4) || currentMovie.first_air_date?.substring(0,4)}
+            {t('game.hint_1')} {currentMovie.release_date?.substring(0,4) || currentMovie.first_air_date?.substring(0,4)}
           </Text>
           {hintsUsed >= 1 && (
             <Text style={[styles.hintText, { color: themeColor, fontWeight: 'bold' }]}>
-              💡 Hint 2: Rating {currentMovie.vote_average}/10
+              {t('game.hint_2')} {currentMovie.vote_average}/10
             </Text>
           )}
         </View>

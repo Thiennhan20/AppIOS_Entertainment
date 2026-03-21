@@ -1,7 +1,7 @@
 {
   "expo": {
     "name": "NTN",
-    "slug": "ntnmovie",
+    "slug": "app_ios",
     "scheme": "ntnmovie",
     "version": "1.0.0",
     "orientation": "portrait",

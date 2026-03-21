@@ -4,7 +4,7 @@ import { useTranslation } from 'react-i18next';
 
 const localClient = axios.create({
   baseURL: `${CONFIG.API_BASE_URL}/api/tmdb`,
-  timeout: 8000,
+  timeout: 60000,
 });
 
 localClient.interceptors.response.use(

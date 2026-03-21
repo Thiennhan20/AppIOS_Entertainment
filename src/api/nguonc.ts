@@ -3,7 +3,7 @@ import { CONFIG } from '../constants/config';
 
 const apiClient = axios.create({
   baseURL: `${CONFIG.API_BASE_URL}/api/server3`,
-  timeout: 20000,
+  timeout: 60000,
 });
 
 apiClient.interceptors.response.use(

@@ -5,7 +5,7 @@ import { useTranslation } from 'react-i18next';
 
 const apiClient = axios.create({
   baseURL: `${CONFIG.API_BASE_URL}/api`,
-  timeout: 10000,
+  timeout: 60000, // Tăng lên 60s để chờ server Render khởi động (cold-boot)
 });
 
 apiClient.interceptors.request.use(async (config) => {

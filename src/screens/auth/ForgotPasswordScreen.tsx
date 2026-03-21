@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, ActivityIndicator, KeyboardAvoidingView, Platform, Alert, Image } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, ActivityIndicator, KeyboardAvoidingView, Platform, Alert, Image, ScrollView, Animated, Keyboard, TouchableWithoutFeedback } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
@@ -30,20 +31,29 @@ export default function ForgotPasswordScreen({ navigation }: any) {
   };
 
   return (
-    <KeyboardAvoidingView 
-      style={styles.container}
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-    >
-      <View style={[styles.innerContainer, { paddingTop: insets.top + 20 }]}>
-        <View style={styles.header}>
-          <Image 
-            source={{ uri: 'https://moviesaw.vercel.app/logo.png' }} 
-            style={styles.logo} 
-            resizeMode="contain"
-          />
-        </View>
+    <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
+      <LinearGradient 
+        colors={['#1a0505', '#0a0a0a', '#000000']} 
+        style={[styles.container, { paddingTop: insets.top }]}
+      >
+        <KeyboardAvoidingView 
+          style={styles.keyboardView}
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        >
+          <ScrollView 
+            contentContainerStyle={styles.scrollContent}
+            showsVerticalScrollIndicator={false}
+            keyboardShouldPersistTaps="handled"
+          >
+            <View style={styles.header}>
+              <Image 
+                source={{ uri: 'https://moviesaw.vercel.app/logo.png' }} 
+                style={styles.logo} 
+                resizeMode="contain"
+              />
+            </View>
 
-        <View style={styles.formContainer}>
+            <View style={styles.formContainer}>
           <Text style={styles.title}>{t('auth.forgot_password')}</Text>
           
           {success ? (
@@ -92,28 +102,33 @@ export default function ForgotPasswordScreen({ navigation }: any) {
 
               <View style={styles.footer}>
                 <Text style={styles.footerText}>{t('auth.remembered_password')}</Text>
-                <TouchableOpacity onPress={() => navigation.navigate('Login')}>
+                <TouchableOpacity onPress={() => navigation.navigate('Login')} style={{ padding: 5 }}>
                   <Text style={styles.footerLink}>Log In ngay</Text>
                 </TouchableOpacity>
               </View>
             </>
           )}
 
-        </View>
-      </View>
-    </KeyboardAvoidingView>
+            </View>
+          </ScrollView>
+        </KeyboardAvoidingView>
+      </LinearGradient>
+    </TouchableWithoutFeedback>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#000000',
   },
-  innerContainer: {
+  keyboardView: {
     flex: 1,
+  },
+  scrollContent: {
+    flexGrow: 1,
     justifyContent: 'center',
     padding: 24,
+    paddingBottom: 60,
   },
   header: {
     alignItems: 'center',

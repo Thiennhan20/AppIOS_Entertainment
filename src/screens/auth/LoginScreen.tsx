@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, ActivityIndicator, KeyboardAvoidingView, Platform, Alert, Image } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, ActivityIndicator, KeyboardAvoidingView, Platform, Alert, Image, ScrollView, Animated, Keyboard, TouchableWithoutFeedback } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useAuth } from '../../context/AuthContext';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -72,17 +73,26 @@ export default function LoginScreen({ navigation }: any) {
   };
 
   return (
-    <KeyboardAvoidingView 
-      style={[styles.container, { paddingTop: insets.top }]} 
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-    >
-      <View style={styles.content}>
-        <View style={styles.header}>
-          <Text style={styles.title}>NTN</Text>
-          <Text style={styles.subtitle}>{t('auth.login_to_watch')}</Text>
-        </View>
+    <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
+      <LinearGradient 
+        colors={['#1a0505', '#0a0a0a', '#000000']} 
+        style={[styles.container, { paddingTop: insets.top }]}
+      >
+        <KeyboardAvoidingView 
+          style={styles.keyboardView} 
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        >
+          <ScrollView 
+            contentContainerStyle={styles.scrollContent}
+            showsVerticalScrollIndicator={false}
+            keyboardShouldPersistTaps="handled"
+          >
+            <View style={styles.header}>
+              <Text style={styles.title}>NTN</Text>
+              <Text style={styles.subtitle}>{t('auth.login_to_watch')}</Text>
+            </View>
 
-        <View style={styles.form}>
+            <View style={styles.form}>
           <View style={styles.inputContainer}>
             <Ionicons name="mail-outline" size={20} color="#999" style={styles.icon} />
             <TextInput
@@ -145,25 +155,29 @@ export default function LoginScreen({ navigation }: any) {
               <Text style={styles.forgotPasswordText}>Forgot Password?</Text>
             </TouchableOpacity>
 
-          <View style={styles.footer}>
-            <Text style={styles.footerText}>{t('auth.no_account')}</Text>
-            <TouchableOpacity onPress={() => navigation.navigate('Register')}>
-              <Text style={styles.footerLink}> Sign Up ngay</Text>
-            </TouchableOpacity>
+            <View style={styles.footer}>
+              <Text style={styles.footerText}>{t('auth.no_account')}</Text>
+              <TouchableOpacity onPress={() => navigation.navigate('Register')} style={{ padding: 5 }}>
+                <Text style={styles.footerLink}> Sign Up ngay</Text>
+              </TouchableOpacity>
+            </View>
           </View>
-        </View>
-      </View>
-    </KeyboardAvoidingView>
+        </ScrollView>
+      </KeyboardAvoidingView>
+    </LinearGradient>
+    </TouchableWithoutFeedback>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#121212',
   },
-  content: {
+  keyboardView: {
     flex: 1,
+  },
+  scrollContent: {
+    flexGrow: 1,
     padding: 24,
     justifyContent: 'center',
   },
@@ -254,7 +268,7 @@ const styles = StyleSheet.create({
     marginLeft: 10,
   },
   forgotPassword: {
-    alignItems: 'center',
+    alignSelf: 'center',
     marginBottom: 20,
     marginTop: 10,
   },

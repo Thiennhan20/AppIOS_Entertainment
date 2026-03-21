@@ -201,7 +201,7 @@ export default function PlayerScreen({ route, navigation }: any) {
             disabled={loadingStream}
           >
             <Ionicons name="server-outline" size={16} color="white" style={{ marginRight: 8 }} />
-            <Text style={[styles.dropdownText, { flex: 1 }]}>{t('player.change_server')} ({selectedServer})</Text>
+            <Text style={[styles.dropdownText, { flex: 1 }]}>{selectedServer}</Text>
             <Ionicons name="chevron-down" size={16} color="white" />
           </TouchableOpacity>
 

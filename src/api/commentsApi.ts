@@ -5,7 +5,7 @@ import { useTranslation } from 'react-i18next';
 
 const commentsClient = axios.create({
   baseURL: `${CONFIG.API_BASE_URL}/api/comments`,
-  timeout: 10000,
+  timeout: 60000,
 });
 
 commentsClient.interceptors.request.use(async (config) => {

@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, ActivityIndicator, KeyboardAvoidingView, Platform, Alert } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, ActivityIndicator, KeyboardAvoidingView, Platform, Alert, ScrollView, Animated, Keyboard, TouchableWithoutFeedback } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useAuth } from '../../context/AuthContext';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -84,23 +85,32 @@ export default function RegisterScreen({ navigation }: any) {
   };
 
   return (
-    <KeyboardAvoidingView 
-      style={[styles.container, { paddingTop: insets.top }]} 
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-    >
-      <View style={styles.headerTop}>
-        <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
-          <Ionicons name="arrow-back" size={24} color="#fff" />
-        </TouchableOpacity>
-      </View>
-      
-      <View style={styles.content}>
-        <View style={styles.header}>
-          <Text style={styles.title}>NTN</Text>
-          <Text style={styles.subtitle}>{t('auth.create_account')}</Text>
-        </View>
+    <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
+      <LinearGradient 
+        colors={['#1a0505', '#0a0a0a', '#000000']} 
+        style={[styles.container, { paddingTop: insets.top }]}
+      >
+        <KeyboardAvoidingView 
+          style={styles.keyboardView} 
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        >
+          <View style={styles.headerTop}>
+            <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
+              <Ionicons name="arrow-back" size={24} color="#fff" />
+            </TouchableOpacity>
+          </View>
+          
+          <ScrollView 
+            contentContainerStyle={styles.scrollContent}
+            showsVerticalScrollIndicator={false}
+            keyboardShouldPersistTaps="handled"
+          >
+            <View style={styles.header}>
+              <Text style={styles.title}>NTN</Text>
+              <Text style={styles.subtitle}>{t('auth.create_account')}</Text>
+            </View>
 
-        <View style={styles.form}>
+            <View style={styles.form}>
          <View style={styles.inputContainer}>
             <Ionicons name="person-outline" size={20} color="#999" style={styles.icon} />
             <TextInput
@@ -167,22 +177,32 @@ export default function RegisterScreen({ navigation }: any) {
             <Text style={styles.googleButtonText}>{t('auth.continue_with_google')}</Text>
           </TouchableOpacity>
 
-          <View style={styles.footer}>
-            <Text style={styles.footerText}>{t('auth.already_have_account')}</Text>
-            <TouchableOpacity onPress={() => navigation.navigate('Login')}>
-              <Text style={styles.footerLink}> Log In ngay</Text>
-            </TouchableOpacity>
+            <View style={styles.footer}>
+              <Text style={styles.footerText}>{t('auth.already_have_account')}</Text>
+              <TouchableOpacity onPress={() => navigation.navigate('Login')} style={{ padding: 5 }}>
+                <Text style={styles.footerLink}> Log In ngay</Text>
+              </TouchableOpacity>
+            </View>
           </View>
-        </View>
-      </View>
-    </KeyboardAvoidingView>
+        </ScrollView>
+      </KeyboardAvoidingView>
+    </LinearGradient>
+    </TouchableWithoutFeedback>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#121212',
+  },
+  keyboardView: {
+    flex: 1,
+  },
+  scrollContent: {
+    flexGrow: 1,
+    padding: 24,
+    justifyContent: 'center',
+    paddingBottom: 100,
   },
   headerTop: {
     paddingHorizontal: 20,
@@ -195,12 +215,6 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255,255,255,0.1)',
     justifyContent: 'center',
     alignItems: 'center',
-  },
-  content: {
-    flex: 1,
-    padding: 24,
-    justifyContent: 'center',
-    paddingBottom: 100,
   },
   header: {
     alignItems: 'center',

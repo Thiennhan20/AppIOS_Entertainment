@@ -19,7 +19,7 @@ export default function AIScreen() {
   const [isLoading, setIsLoading] = useState(false);
   const flatListRef = useRef<FlatList>(null);
 
-  const QUICK_REPLIES = ["t('ai.movie_suggestions_today')", "t('ai.best_horror')", "t('ai.trending_series')", "t('ai.vn_movies')"];
+  const QUICK_REPLIES = [t('ai.movie_suggestions_today'), t('ai.best_horror'), t('ai.trending_series'), t('ai.vn_movies')];
 
   useEffect(() => {
     loadHistory();

@@ -26,9 +26,10 @@ export default function ProfileScreen({ navigation }: any) {
 
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
-      <View style={styles.header}>
-        <Text style={styles.headerTitle}>{t('general.profile')}</Text>
-      </View>
+      <ScrollView contentContainerStyle={{ flexGrow: 1, paddingBottom: 60 }} showsVerticalScrollIndicator={false}>
+        <View style={styles.header}>
+          <Text style={styles.headerTitle}>{t('general.profile')}</Text>
+        </View>
 
       <View style={[styles.profileSection, { borderBottomColor: themeColor }]}>
         {user?.avatar ? (
@@ -128,12 +129,13 @@ export default function ProfileScreen({ navigation }: any) {
 
       </View>
 
-      <TouchableOpacity 
-        style={[styles.logoutButton, { borderColor: themeColor, backgroundColor: `${themeColor}1A` }]} 
-        onPress={handleLogoutPress}
-      >
-        <Text style={[styles.logoutText, { color: themeColor }]}>{t('profile.logout')}</Text>
-      </TouchableOpacity>
+        <TouchableOpacity 
+          style={[styles.logoutButton, { borderColor: themeColor, backgroundColor: `${themeColor}1A` }]} 
+          onPress={handleLogoutPress}
+        >
+          <Text style={[styles.logoutText, { color: themeColor }]}>{t('profile.logout')}</Text>
+        </TouchableOpacity>
+      </ScrollView>
 
       {/* Custom Logout Modal */}
       <Modal

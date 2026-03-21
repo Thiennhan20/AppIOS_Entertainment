@@ -4,7 +4,7 @@ import { useTranslation } from 'react-i18next';
 
 const apiClient = axios.create({
   baseURL: `${CONFIG.API_BASE_URL}/api/server1`,
-  timeout: 15000,
+  timeout: 60000,
 });
 
 apiClient.interceptors.response.use(

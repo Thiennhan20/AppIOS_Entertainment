@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { 
   StyleSheet, Text, View, Image, ScrollView, FlatList,
-  TouchableOpacity, Dimensions, ActivityIndicator, Modal
+  TouchableOpacity, Dimensions, ActivityIndicator, Modal, Alert
 } from 'react-native';
 import YoutubePlayer from 'react-native-youtube-iframe';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -13,6 +13,7 @@ import { chatAIApi } from '../api/chatAI';
 import { authApi } from '../api/authApi';
 import { useTheme } from '../context/ThemeContext';
 import WatchlistButton from '../components/WatchlistButton';
+import LongPressMoviePopup from '../components/LongPressMoviePopup';
 
 const { width, height } = Dimensions.get('window');
 
@@ -30,6 +31,12 @@ export default function DetailScreen({ route, navigation }: any) {
 
   const [trailerKey, setTrailerKey] = useState<string | null>(null);
   const [showTrailer, setShowTrailer] = useState(false);
+
+  const [selectedMovie, setSelectedMovie] = useState<any>(null);
+
+  const handleLongPress = (item: any, isTVItem: boolean) => {
+    setSelectedMovie({ ...item, isTV: isTVItem });
+  };
 
   useEffect(() => {
     const fetchDetails = async () => {
@@ -116,12 +123,16 @@ export default function DetailScreen({ route, navigation }: any) {
             </TouchableOpacity>
 
             <View style={styles.actionRowMini}>
-              {trailerKey && (
-                <TouchableOpacity style={styles.actionItemMini} onPress={() => setShowTrailer(true)}>
-                  <Ionicons name="film-outline" size={24} color="gray" />
-                  <Text style={styles.actionItemTextMini}>{t('home.trailer')}</Text>
-                </TouchableOpacity>
-              )}
+              <TouchableOpacity 
+                style={styles.actionItemMini} 
+                onPress={() => {
+                  if (trailerKey) setShowTrailer(true);
+                  else Alert.alert(t('general.notice'), t('home.cannot_load_trailer'));
+                }}
+              >
+                <Ionicons name="film-outline" size={24} color={trailerKey ? "white" : "gray"} />
+                <Text style={styles.actionItemTextMini}>{t('home.trailer')}</Text>
+              </TouchableOpacity>
               <WatchlistButton movie={{ ...item, isTV }} styleType="detail" />
               <TouchableOpacity style={styles.actionItemMini}>
                 <Ionicons name="thumbs-up-outline" size={24} color="white" />
@@ -218,6 +229,7 @@ export default function DetailScreen({ route, navigation }: any) {
                   <TouchableOpacity 
                     style={styles.similarItem}
                     onPress={() => navigation.push('DetailScreen', { item, isTV })}
+                    onLongPress={() => handleLongPress(item, isTV)}
                   >
                     <Image 
                       source={{ uri: `https://image.tmdb.org/t/p/w200${item.poster_path}` }} 
@@ -265,6 +277,12 @@ export default function DetailScreen({ route, navigation }: any) {
         )}
       </Modal>
 
+      {selectedMovie && (
+        <LongPressMoviePopup
+          movie={selectedMovie}
+          onClose={() => setSelectedMovie(null)}
+        />
+      )}
     </View>
   );
 }
