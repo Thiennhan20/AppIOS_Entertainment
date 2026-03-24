@@ -102,51 +102,127 @@ function findBestMatch(items: any[], targetTitle: string, targetYear: number, tm
 }
 
 export const phimApi = {
-  async getStreamingLink(tmdbId: string, title: string, year: number): Promise<{ id: string, name: string, url: string }[] | null> {
+  async getStreamingLink(tmdbId: string, title: string, year: number, selectedEpisode: number = 1, isTV: boolean = false, selectedSeason: number = 1): Promise<{ id: string, name: string, url: string }[] | null> {
     try {
       let slug = null;
+      let finalDetailData: any = null;
 
-      // 1. Direct fetch using TMDB API Lookup endpoint
+      const titleForSearch = normalizeTitle(title);
+      const originNameWithSeason = `${title} (Season ${selectedSeason})`;
+
+      const checkEpisodeExists = (episodes: any[]) => {
+        if (!episodes || episodes.length === 0) return false;
+        return episodes.some((group: any) => {
+          if (!group.server_data) return false;
+          return group.server_data.some((ep: any) => 
+            ep.name === selectedEpisode.toString() || 
+            ep.name?.toLowerCase() === `tập ${selectedEpisode}` || 
+            ep.name?.toLowerCase() === `tập 0${selectedEpisode}` ||
+            ep.slug === `tap-${selectedEpisode}` ||
+            ep.slug === `${selectedEpisode}` ||
+            ep.slug === 'full' ||
+            ep.name?.toLowerCase() === 'full'
+          );
+        });
+      };
+
+      const searchAndGetDetail = async (keyword: string) => {
+        try {
+          const searchData: any = await apiClient.get('/search', { params: { keyword } });
+          if (searchData?.status === 'success' && searchData.data?.items) {
+             for (const item of searchData.data.items) {
+               try {
+                 const detailData: any = await apiClient.get(`/detail/${item.slug}`);
+                 if (checkEpisodeExists(detailData.episodes)) {
+                    return { slug: item.slug, detailData };
+                 }
+               } catch (e) {}
+             }
+             
+             // Fallback: if it's a movie and we didn't match episode, just return the first item's details that HAS episodes
+             if (!isTV && searchData.data.items.length > 0) {
+               const fallbackItem = searchData.data.items[0];
+               const fbData: any = await apiClient.get(`/detail/${fallbackItem.slug}`);
+               if (fbData.episodes?.length > 0) {
+                 return { slug: fallbackItem.slug, detailData: fbData };
+               }
+             }
+          }
+        } catch (e) {}
+        return null;
+      };
+
+      // 1. Try tmdb directly
       try {
         const tmdbDirectData: any = await apiClient.get(`/tmdb/movie/${tmdbId}`);
         if (tmdbDirectData?.status === true && tmdbDirectData?.movie) {
-          const apiSlug = tmdbDirectData.movie.slug;
-          
-          if (apiSlug) {
-             slug = apiSlug;
-          }
-        }
-      } catch(e) {}
-
-      // 2. Search fallback
-      if (!slug) {
-        const searchData: any = await apiClient.get('/search', { params: { keyword: title } });
-        if (searchData?.status === 'success' && searchData.data?.items) {
-           const match = findBestMatch(searchData.data.items, title, year, tmdbId);
-           if (match) {
-             slug = match.slug;
+           const apiSlug = tmdbDirectData.movie.slug;
+           const detailData: any = await apiClient.get(`/detail/${apiSlug}`);
+           
+           if (checkEpisodeExists(detailData.episodes) || !isTV) {
+              slug = apiSlug;
+              finalDetailData = detailData;
            }
         }
+      } catch (e) {}
+
+      // 2. Search fallback with priorities
+      if (!slug) {
+         if (isTV) {
+           const keywords = [
+              originNameWithSeason,
+              `${titleForSearch} phần ${selectedSeason}`,
+              `${titleForSearch} part ${selectedSeason}`,
+              `${titleForSearch} season ${selectedSeason}`,
+              `${titleForSearch} tập ${selectedEpisode}`,
+              title
+           ];
+           for (const kw of keywords) {
+             const res = await searchAndGetDetail(kw);
+             if (res) {
+                slug = res.slug;
+                finalDetailData = res.detailData;
+                break;
+             }
+           }
+         } else {
+           const res = await searchAndGetDetail(title);
+           if (res) {
+             slug = res.slug;
+             finalDetailData = res.detailData;
+           }
+         }
       }
 
-      if (!slug) return null;
+      if (!slug || !finalDetailData) return null;
 
-      // 3. Get Details to extract the valid M3U8 link
-      const detailData: any = await apiClient.get(`/detail/${slug}`);
-      
       let results: { id: string, name: string, url: string }[] = [];
 
-      if (detailData.episodes && detailData.episodes.length > 0) {
-        detailData.episodes.forEach((ep: any, index: number) => {
-          if (ep.server_data && ep.server_data.length > 0) {
-            let m3u8Link = ep.server_data[0].link_m3u8;
+      if (finalDetailData.episodes && finalDetailData.episodes.length > 0) {
+        finalDetailData.episodes.forEach((serverGroup: any, index: number) => {
+          if (serverGroup.server_data && serverGroup.server_data.length > 0) {
+            
+            let episodeData = serverGroup.server_data.find((ep: any) => {
+               const nameMatches = ep.name === selectedEpisode.toString() || ep.name?.toLowerCase() === `tập ${selectedEpisode}` || ep.name?.toLowerCase() === `tập 0${selectedEpisode}` || ep.name?.toLowerCase() === 'full';
+               const slugMatches = ep.slug === `tap-${selectedEpisode}` || ep.slug === `${selectedEpisode}` || ep.slug === 'full';
+               return nameMatches || slugMatches;
+            });
+
+            if (!episodeData) {
+               episodeData = serverGroup.server_data[selectedEpisode - 1];
+            }
+            if (!episodeData) {
+               episodeData = serverGroup.server_data[0];
+            }
+
+            let m3u8Link = episodeData?.link_m3u8;
             if (m3u8Link && m3u8Link.includes('?url=')) {
               m3u8Link = m3u8Link.split('?url=')[1];
             }
             if (m3u8Link) {
               results.push({
-                id: `phimapi_${index}`,
-                name: ep.server_name || `Server 1 - ${index + 1}`,
+                id: `server1_${index}`,
+                name: serverGroup.server_name || `Track ${index + 1}`,
                 url: m3u8Link
               });
             }

@@ -1,6 +1,7 @@
 import React, { createContext, useState, useContext, useEffect } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { authApi } from '../api/authApi';
+import { clearWatchlistCache } from '../components/WatchlistButton';
 import { Alert } from 'react-native';
 
 export const AuthContext = createContext<any>(null);
@@ -33,6 +34,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     try {
       const data = await authApi.login(email, password);
       await AsyncStorage.setItem('@auth_token', data.token);
+      clearWatchlistCache();
       setUser(data.user);
       return { success: true };
     } catch (err: any) {
@@ -55,6 +57,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     try {
       const data = await authApi.googleLogin(idToken);
       await AsyncStorage.setItem('@auth_token', data.token);
+      clearWatchlistCache();
       setUser(data.user);
       return { success: true };
     } catch (err: any) {
@@ -66,6 +69,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const logout = async () => {
     await authApi.logout();
     await AsyncStorage.removeItem('@auth_token');
+    clearWatchlistCache();
     setUser(null);
   };
 

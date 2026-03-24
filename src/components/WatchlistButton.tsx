@@ -1,9 +1,18 @@
 import React, { useState, useEffect } from 'react';
-import { TouchableOpacity, Text, StyleSheet, ActivityIndicator, Vibration } from 'react-native';
+import { TouchableOpacity, Text, StyleSheet, ActivityIndicator, Vibration, DeviceEventEmitter } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
 import { authApi } from '../api/authApi';
 import { useToast } from '../context/ToastContext';
+
+const WATCHLIST_EVENT = 'watchlist_updated';
+let globalWatchlist: Set<string> | null = null;
+let watchlistFetchPromise: Promise<void> | null = null;
+
+export const clearWatchlistCache = () => {
+  globalWatchlist = null;
+  watchlistFetchPromise = null;
+};
 
 interface WatchlistButtonProps {
   movie: any | null;
@@ -14,20 +23,42 @@ interface WatchlistButtonProps {
 export default function WatchlistButton({ movie, styleType = 'detail', onWatchlistUpdated }: WatchlistButtonProps) {
   const { t } = useTranslation();
   const [isSaved, setIsSaved] = useState(false);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const { showToast } = useToast();
 
   useEffect(() => {
     checkWatchlistStatus();
+    
+    const subscription = DeviceEventEmitter.addListener(WATCHLIST_EVENT, (eventData) => {
+      if (movie && String(eventData.id) === String(movie.id)) {
+        setIsSaved(eventData.saved);
+      }
+    });
+
+    return () => {
+      subscription.remove();
+    };
   }, [movie]);
 
   const checkWatchlistStatus = async () => {
     if (!movie) return;
     try {
-      const resp: any = await authApi.getWatchlist();
-      const list = resp?.watchlist || [];
-      const saved = list.some((m: any) => String(m.id || m.contentId) === String(movie.id));
-      setIsSaved(saved);
+      if (globalWatchlist !== null) {
+        setIsSaved(globalWatchlist.has(String(movie.id)));
+        return;
+      }
+      if (!watchlistFetchPromise) {
+        watchlistFetchPromise = (async () => {
+          const resp: any = await authApi.getWatchlist();
+          const list = resp?.watchlist || [];
+          globalWatchlist = new Set(list.map((m: any) => String(m.id || m.contentId)));
+        })();
+      }
+      await watchlistFetchPromise;
+      const refreshedWatchlist = globalWatchlist as Set<string> | null;
+      if (refreshedWatchlist) {
+        setIsSaved(refreshedWatchlist.has(String(movie.id)));
+      }
     } catch (e) {
       console.warn("Could not fetch watchlist state", e);
     } finally {
@@ -43,6 +74,8 @@ export default function WatchlistButton({ movie, styleType = 'detail', onWatchli
       if (isSaved) {
         await authApi.removeFromWatchlist(movie.id);
         setIsSaved(false);
+        if (globalWatchlist) globalWatchlist.delete(String(movie.id));
+        DeviceEventEmitter.emit(WATCHLIST_EVENT, { id: movie.id, saved: false });
         showToast(t('watchlist.removed'), 'info');
         if (onWatchlistUpdated) onWatchlistUpdated();
       } else {
@@ -55,6 +88,8 @@ export default function WatchlistButton({ movie, styleType = 'detail', onWatchli
           
         await authApi.addToWatchlist(movie.id, title, poster, type);
         setIsSaved(true);
+        if (globalWatchlist) globalWatchlist.add(String(movie.id));
+        DeviceEventEmitter.emit(WATCHLIST_EVENT, { id: movie.id, saved: true });
         showToast(t('watchlist.added'), 'success');
         if (onWatchlistUpdated) onWatchlistUpdated();
       }

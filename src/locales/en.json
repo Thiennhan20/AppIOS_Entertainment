@@ -82,7 +82,10 @@
     "error_loading_stream": "Error loading stream! Network connection is unstable.",
     "comments": "Comments",
     "please_select_server": "Please select a server and press Play",
-    "close": "Close"
+    "close": "Close",
+    "write_comment": "Write a comment...",
+    "close_comments": "Close Comments",
+    "open_comments": "Open Comments"
   },
   "watchlist": {
     "added": "Added to Watchlist!",

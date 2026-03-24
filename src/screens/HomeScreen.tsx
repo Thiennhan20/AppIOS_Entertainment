@@ -227,6 +227,34 @@ const ms = StyleSheet.create({
   },
 });
 
+const SKELETON_COLOR_1 = '#1c1c24';
+const SKELETON_COLOR_2 = '#2a2a35';
+
+function SkeletonRow({ titleWidth = 100 }: { titleWidth?: number }) {
+  return (
+    <View style={{ paddingBottom: 15 }}>
+      <View style={{ width: titleWidth, height: 20, backgroundColor: SKELETON_COLOR_1, marginLeft: 18, marginTop: 22, marginBottom: 10, borderRadius: 4 }} />
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 18 }}>
+        {[1,2,3,4].map(i => (
+          <View key={i} style={{ width: 108, height: 158, backgroundColor: SKELETON_COLOR_1, borderRadius: 9, marginRight: 12 }} />
+        ))}
+      </ScrollView>
+    </View>
+  );
+}
+
+function HomeScreenSkeleton() {
+  const insets = useSafeAreaInsets();
+  return (
+    <View style={[styles.container, { paddingTop: 0 }]}>
+      <View style={[styles.featuredContainer, { backgroundColor: SKELETON_COLOR_1 }]} />
+      <SkeletonRow titleWidth={150} />
+      <SkeletonRow titleWidth={120} />
+      <SkeletonRow titleWidth={180} />
+    </View>
+  );
+}
+
 // ─── Main HomeScreen ─────────────────────────────────────────────────────────
 export default function HomeScreen({ navigation }: any) {
   const { t } = useTranslation();
@@ -248,7 +276,21 @@ export default function HomeScreen({ navigation }: any) {
 
   const [featuredList,   setFeaturedList]   = useState<any[]>([]);
   const [featuredIdx,    setFeaturedIdx]    = useState(0);
+  const [prevFeaturedIdx, setPrevFeaturedIdx] = useState(0);
+  const fadeAnim = React.useRef(new Animated.Value(1)).current;
   const carouselTimer = React.useRef<NodeJS.Timeout | null>(null);
+
+  useEffect(() => {
+    if (featuredIdx === prevFeaturedIdx) return;
+    fadeAnim.setValue(0);
+    Animated.timing(fadeAnim, {
+      toValue: 1,
+      duration: 800,
+      useNativeDriver: true,
+    }).start(() => {
+      setPrevFeaturedIdx(featuredIdx);
+    });
+  }, [featuredIdx]);
 
   const [topComments,    setTopComments]    = useState<any[]>([]);
   const [recentComments, setRecentComments] = useState<any[]>([]);
@@ -256,6 +298,9 @@ export default function HomeScreen({ navigation }: any) {
   const [loading,        setLoading]        = useState(true);
   const [refreshing,     setRefreshing]     = useState(false);
   const [menuVisible,    setMenuVisible]    = useState(false);
+
+  const [phase2Loaded,   setPhase2Loaded]   = useState(false);
+  const [loadingPhase2,  setLoadingPhase2]  = useState(false);
 
   const [activeTrailerKey, setActiveTrailerKey] = useState<string | null>(null);
   const [showTrailer, setShowTrailer] = useState(false);
@@ -284,10 +329,12 @@ export default function HomeScreen({ navigation }: any) {
 
   const fetchUserData = async () => {
     try {
-      const histResp: any = await authApi.getRecentlyWatched();
-      const watchResp: any = await authApi.getWatchlist();
-      setRecentlyWatched(histResp.items || []);
-      setWatchlist(watchResp.watchlist || []);
+      const [histResp, watchResp] = await Promise.all([
+        authApi.getRecentlyWatched(),
+        authApi.getWatchlist()
+      ]);
+      setRecentlyWatched((histResp as any)?.items || []);
+      setWatchlist((watchResp as any)?.watchlist || []);
     } catch {
       // User might not be logged in or error
     }
@@ -301,43 +348,15 @@ export default function HomeScreen({ navigation }: any) {
 
   const fetchData = async () => {
     try {
-      const [movieData, tvData, topData, upcomingData, actionData, animeData, horrorData, romanceData] = await Promise.all([
+      const [movieData, tvData] = await Promise.all([
         tmdbApi.getTrendingMovies(),
         tmdbApi.getTrendingTV(),
-        tmdbApi.getTopRatedMovies(),
-        tmdbApi.getUpcomingMovies(),
-        tmdbApi.getActionMovies(),
-        tmdbApi.getAnime(),
-        tmdbApi.getHorrorMovies(),
-        tmdbApi.getRomanceMovies(),
       ]);
-      const movies  = (movieData    as any)?.results || [];
-      const tv      = (tvData       as any)?.results || [];
-      const top     = (topData      as any)?.results || [];
+      const movies = (movieData as any)?.results || [];
+      const tv = (tvData as any)?.results || [];
       
-      const upData  = (upcomingData as any)?.results || [];
-      const up = upData.filter((movie: any) => {
-        if (!movie.release_date) return false;
-        const movieReleaseDate = new Date(movie.release_date);
-        const currentDateObj = new Date();
-        // Cần reset giờ về 0 để compare công bằng trong ngày
-        currentDateObj.setHours(0,0,0,0);
-        return movieReleaseDate >= currentDateObj;
-      });
-
-      const action  = (actionData   as any)?.results || [];
-      const ani     = (animeData    as any)?.results || [];
-      const horror  = (horrorData   as any)?.results || [];
-      const romance = (romanceData  as any)?.results || [];
-
       setTrendingMovies(movies);
       setTrendingTV(tv);
-      setTopRated(top);
-      setUpcoming(up);
-      setActionMovies(action);
-      setAnime(ani);
-      setHorrorMovies(horror);
-      setRomanceMovies(romance);
 
       if (movies.length >= 3 && tv.length >= 2) {
         setFeaturedList([
@@ -349,12 +368,52 @@ export default function HomeScreen({ navigation }: any) {
         ]);
       }
     } catch (e) {
-      console.warn('Backend might be down/slow:', e);
+      console.warn('Phase 1 err:', e);
     } finally {
       setLoading(false);
       setRefreshing(false);
     }
   };
+
+  const fetchPhase2 = async () => {
+    if (phase2Loaded || loadingPhase2) return;
+    setLoadingPhase2(true);
+    try {
+      const [topData, upcomingData, actionData, animeData, horrorData, romanceData] = await Promise.all([
+        tmdbApi.getTopRatedMovies(),
+        tmdbApi.getUpcomingMovies(),
+        tmdbApi.getActionMovies(),
+        tmdbApi.getAnime(),
+        tmdbApi.getHorrorMovies(),
+        tmdbApi.getRomanceMovies(),
+      ]);
+      
+      const top = (topData as any)?.results || [];
+      const upData  = (upcomingData as any)?.results || [];
+      const up = upData.filter((movie: any) => {
+        if (!movie.release_date) return false;
+        const movieReleaseDate = new Date(movie.release_date);
+        const currentDateObj = new Date();
+        currentDateObj.setHours(0,0,0,0);
+        return movieReleaseDate >= currentDateObj;
+      });
+
+      const action  = (actionData as any)?.results || [];
+      const ani     = (animeData  as any)?.results || [];
+      const horror  = (horrorData as any)?.results || [];
+      const romance = (romanceData as any)?.results || [];
+
+      setTopRated(top);
+      setUpcoming(up);
+      setActionMovies(action);
+      setAnime(ani);
+      setHorrorMovies(horror);
+      setRomanceMovies(romance);
+      setPhase2Loaded(true);
+    } catch (e) { console.warn('Phase 2 err:', e); } 
+      finally { setLoadingPhase2(false); }
+  };
+
 
   const startCarousel = () => {
     if (carouselTimer.current) clearInterval(carouselTimer.current);
@@ -556,17 +615,21 @@ export default function HomeScreen({ navigation }: any) {
 
   if (loading) {
     return (
-      <View style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
-        <ActivityIndicator size="large" color={themeColor} />
+      <View style={styles.container}>
+        <HomeScreenSkeleton />
       </View>
     );
   }
 
   const currentFeatured = featuredList[featuredIdx] || featuredList[0];
+  const prevFeatured = featuredList[prevFeaturedIdx] || featuredList[0];
+
   const featuredImageUri = currentFeatured?.poster_path
     ? `https://image.tmdb.org/t/p/w780${currentFeatured.poster_path}` : null;
+  const prevImageUri = prevFeatured?.poster_path
+    ? `https://image.tmdb.org/t/p/w780${prevFeatured.poster_path}` : null;
 
-  const homeSections = [
+  const baseSections = [
     { id: 'featured', type: 'FEATURED' },
     { id: 'trending_movies', label: t('home.trending_movies'), data: trendingMovies, type: 'MOVIE_ROW', isTV: false, isHistory: false, isWatchlist: false },
     { id: 'history', label: `▶️ ${t('home.continue_watching')}`, data: recentlyWatched, type: 'MOVIE_ROW', isTV: false, isHistory: true, isWatchlist: false },
@@ -574,31 +637,50 @@ export default function HomeScreen({ navigation }: any) {
     { id: 'watchlist_row', label: t('home.your_watchlist'), data: watchlist, type: 'MOVIE_ROW', isTV: false, isHistory: false, isWatchlist: true },
     { id: 'top_comments', type: 'TOP_COMMENTS', data: topComments },
     { id: 'recent_comments', type: 'RECENT_COMMENTS', data: recentComments },
-    { id: 'upcoming', label: t('home.coming_soon'), data: upcoming, type: 'MOVIE_ROW', isTV: false, isHistory: false, isWatchlist: false },
-    { id: 'action', label: t('home.action_thriller'), data: actionMovies, type: 'MOVIE_ROW', isTV: false, isHistory: false, isWatchlist: false },
-    { id: 'anime', label: t('home.anime_animation'), data: anime, type: 'MOVIE_ROW', isTV: true, isHistory: false, isWatchlist: false },
-    { id: 'horror', label: t('home.horror_thrills'), data: horrorMovies, type: 'MOVIE_ROW', isTV: false, isHistory: false, isWatchlist: false },
-    { id: 'romance', label: t('home.sweet_romance'), data: romanceMovies, type: 'MOVIE_ROW', isTV: false, isHistory: false, isWatchlist: false },
-    { id: 'top_rated', label: t('home.top_rated'), data: topRated, type: 'MOVIE_ROW', isTV: false, isHistory: false, isWatchlist: false },
-  ].filter(s => s.type === 'FEATURED' || (s.data && s.data.length > 0));
+  ];
+
+  if (phase2Loaded) {
+    baseSections.push(
+      { id: 'upcoming', label: t('home.coming_soon'), data: upcoming, type: 'MOVIE_ROW', isTV: false, isHistory: false, isWatchlist: false },
+      { id: 'action', label: t('home.action_thriller'), data: actionMovies, type: 'MOVIE_ROW', isTV: false, isHistory: false, isWatchlist: false },
+      { id: 'anime', label: t('home.anime_animation'), data: anime, type: 'MOVIE_ROW', isTV: true, isHistory: false, isWatchlist: false },
+      { id: 'horror', label: t('home.horror_thrills'), data: horrorMovies, type: 'MOVIE_ROW', isTV: false, isHistory: false, isWatchlist: false },
+      { id: 'romance', label: t('home.sweet_romance'), data: romanceMovies, type: 'MOVIE_ROW', isTV: false, isHistory: false, isWatchlist: false },
+      { id: 'top_rated', label: t('home.top_rated'), data: topRated, type: 'MOVIE_ROW', isTV: false, isHistory: false, isWatchlist: false }
+    );
+  }
+
+  const finalSections = baseSections.filter(s => s.type === 'FEATURED' || (s.data && s.data.length > 0));
 
   const renderHomeSection = ({ item: section }: any) => {
     if (section.type === 'FEATURED') {
       return (
         <View style={styles.featuredContainer}>
-          {featuredImageUri ? (
-            <Image source={{ uri: featuredImageUri }} style={styles.featuredImage} />
+          {/* Previous Image as Bottom Layer */}
+          {prevImageUri ? (
+            <Image source={{ uri: prevImageUri }} style={styles.featuredImage} />
           ) : (
             <Image source={DEFAULT_FEATURED} style={styles.featuredImage} />
           )}
+
+          {/* New Image Fading In over Bottom Layer */}
+          <Animated.View style={[StyleSheet.absoluteFillObject, { opacity: fadeAnim }]}>
+            {featuredImageUri ? (
+              <Image source={{ uri: featuredImageUri }} style={styles.featuredImage} />
+            ) : (
+              <Image source={DEFAULT_FEATURED} style={styles.featuredImage} />
+            )}
+          </Animated.View>
+
           <LinearGradient
             colors={['transparent', 'rgba(15,15,19,0.8)', '#0f0f13']}
             style={styles.gradient}
           />
           <View style={styles.featuredContent}>
-            <Text style={styles.featuredCategory}>
+            {/* Fade in new Title Text smoothly */}
+            <Animated.Text style={[styles.featuredCategory, { opacity: fadeAnim }]}>
               {currentFeatured?.isTV ? 'TV Series' : 'Movie'} • {currentFeatured?.original_language === 'en' ? 'Hollywood' : 'International'}
-            </Text>
+            </Animated.Text>
             <View style={styles.featuredActions}>
               <WatchlistButton 
                 movie={currentFeatured} 
@@ -798,7 +880,7 @@ export default function HomeScreen({ navigation }: any) {
 
       {/* ── Scrollable content ── */}
       <FlatList
-        data={homeSections}
+        data={finalSections}
         keyExtractor={(item) => item.id}
         renderItem={renderHomeSection}
         showsVerticalScrollIndicator={false}
@@ -807,9 +889,12 @@ export default function HomeScreen({ navigation }: any) {
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={themeColor} />
         }
         removeClippedSubviews={true}
-        initialNumToRender={3}
+        initialNumToRender={5}
         maxToRenderPerBatch={3}
-        windowSize={3}
+        windowSize={5}
+        onEndReached={fetchPhase2}
+        onEndReachedThreshold={0.5}
+        ListFooterComponent={loadingPhase2 ? <View style={{ height: 200, justifyContent: 'center' }}><ActivityIndicator size="large" color={themeColor} /><Text style={{color: 'gray', textAlign: 'center', marginTop: 10}}>Loading more...</Text></View> : null}
       />
 
       {/* Trailer Modal (như trên web) */}

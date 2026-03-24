@@ -1,5 +1,5 @@
 import React, { useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, Animated, Dimensions, Easing } from 'react-native';
+import { View, Text, StyleSheet, Animated, Dimensions, Easing, Image } from 'react-native';
 import { useTheme } from '../context/ThemeContext';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
@@ -21,42 +21,49 @@ export default function SplashScreen({ onFinish }: SplashScreenProps) {
   const color2 = useRef(new Animated.Value(0)).current;
   const color3 = useRef(new Animated.Value(0)).current;
   const bgRedOpacity = useRef(new Animated.Value(0)).current;
+  const watermarkOpacity = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
     // 1. Instantly start scaling up the logo slowly and fade background to red (Native API)
-    // Easing.poly(5) makes it start VERY slow, then accelerate super fast at the end
+    // Easing.inOut creates the "Chậm - Nhanh - Chậm" (Slow - Fast - Slow) effect
     Animated.parallel([
       Animated.timing(scaleAnim, {
-        toValue: 1.05,
-        duration: 1500,
-        easing: Easing.in(Easing.poly(5)),
+        toValue: 1.08,
+        duration: 1800,
+        easing: Easing.inOut(Easing.poly(4)),
         useNativeDriver: true,
       }),
       Animated.timing(bgRedOpacity, {
         toValue: 1,
-        duration: 1500,
-        easing: Easing.in(Easing.poly(5)),
+        duration: 1800,
+        easing: Easing.inOut(Easing.poly(4)),
+        useNativeDriver: true,
+      }),
+      Animated.timing(watermarkOpacity, {
+        toValue: 0.15,
+        duration: 1800,
+        easing: Easing.inOut(Easing.poly(4)),
         useNativeDriver: true,
       }),
     ]).start();
 
     // 2. Wave color fade staggering from left to right (JS API)
-    Animated.stagger(200, [
-      Animated.timing(color1, { toValue: 1, duration: 800, easing: Easing.in(Easing.poly(4)), useNativeDriver: false }),
-      Animated.timing(color2, { toValue: 1, duration: 800, easing: Easing.in(Easing.poly(4)), useNativeDriver: false }),
-      Animated.timing(color3, { toValue: 1, duration: 800, easing: Easing.in(Easing.poly(4)), useNativeDriver: false }),
+    Animated.stagger(250, [
+      Animated.timing(color1, { toValue: 1, duration: 900, easing: Easing.inOut(Easing.poly(3)), useNativeDriver: false }),
+      Animated.timing(color2, { toValue: 1, duration: 900, easing: Easing.inOut(Easing.poly(3)), useNativeDriver: false }),
+      Animated.timing(color3, { toValue: 1, duration: 900, easing: Easing.inOut(Easing.poly(3)), useNativeDriver: false }),
     ]).start();
 
-    // 2. After 1.5 seconds, fade out completely to reveal the app
+    // 3. After 1.8 seconds, fade out completely to reveal the app
     const timer = setTimeout(() => {
       Animated.timing(fadeAnim, {
         toValue: 0,
-        duration: 400,
+        duration: 500,
         useNativeDriver: true,
       }).start(() => {
         onFinish();
       });
-    }, 1500);
+    }, 1800);
 
     return () => clearTimeout(timer);
   }, []);
@@ -94,17 +101,21 @@ export default function SplashScreen({ onFinish }: SplashScreenProps) {
       />
       
       {/* NTN Text with cinematic expansion and wave color fade */}
-      <Animated.View style={{ transform: [{ scale: scaleAnim }], alignItems: 'center' }}>
+      <Animated.View style={{ transform: [{ scale: scaleAnim }], alignItems: 'center', justifyContent: 'center' }}>
         
-        <View style={{ marginBottom: 6, position: 'relative' }}>
-          {/* Base Red Icon */}
-          <Ionicons name="videocam" size={42} color={themeColor} />
-          
-          {/* Fading Black Icon overlay (driven by color2 timeline [0->1]) */}
-          <Animated.View style={{ position: 'absolute', opacity: color2 }}>
-            <Ionicons name="videocam" size={42} color="#000000" />
-          </Animated.View>
-        </View>
+        {/* Faint Watermark Logo fading in */}
+        <Animated.Image 
+          source={require('../../assets/icon.png')} 
+          style={{
+            position: 'absolute',
+            width: 200,
+            height: 200,
+            opacity: watermarkOpacity,
+            zIndex: -1,
+            transform: [{ scale: 1.2 }] // Slightly larger for majestic feel
+          }}
+          resizeMode="contain"
+        />
 
         <View style={{ flexDirection: 'row' }}>
           <Animated.Text style={[styles.logoText, style1]}>N</Animated.Text>

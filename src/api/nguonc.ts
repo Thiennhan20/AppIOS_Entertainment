@@ -12,7 +12,7 @@ apiClient.interceptors.response.use(
 );
 
 export const nguoncApi = {
-  async getStreamingLink(isTV: boolean, title: string, year: number, director: string = ''): Promise<{ vietsub: string, dubbed: string, m3u8: string } | null> {
+  async getStreamingLink(isTV: boolean, title: string, year: number, director: string = '', selectedSeason: number = 1, selectedEpisode: number = 1): Promise<{ vietsub: string, dubbed: string, m3u8: string } | null> {
     try {
       const endpoint = isTV ? '/search-tv' : '/search-movie';
       
@@ -21,7 +21,8 @@ export const nguoncApi = {
           keyword: title,
           name: title,
           year: year,
-          director: director
+          director: director,
+          ...(isTV && { season: selectedSeason, episode: selectedEpisode })
         }
       });
 

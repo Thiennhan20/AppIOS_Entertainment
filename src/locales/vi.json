@@ -82,7 +82,10 @@
     "error_loading_stream": "Lỗi khi tải stream! Quá nhiều kết nối hoặc kết nối mạng không ổn định.",
     "comments": "Bình luận",
     "please_select_server": "Vui lòng chọn Server và nhấn Play",
-    "close": "Đóng"
+    "close": "Đóng",
+    "write_comment": "Bình luận tại đây...",
+    "close_comments": "Đóng Khu Vực Bình Luận",
+    "open_comments": "Mở Khu Vực Bình Luận"
   },
   "watchlist": {
     "added": "Đã thêm vào danh sách yêu thích!",

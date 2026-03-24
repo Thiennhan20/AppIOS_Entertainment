@@ -100,7 +100,7 @@ export default function ProfileScreen({ navigation }: any) {
                   colors={(tc.gradient as [string, string]) || [tc.color, tc.color]}
                   start={{ x: 0, y: 0 }}
                   end={{ x: 1, y: 1 }}
-                  style={[StyleSheet.absoluteFillObject, { borderRadius: 16 }]}
+                  style={[StyleSheet.absoluteFillObject, { borderRadius: 999 }]}
                 />
                 {themeColor === tc.color && (
                   <Ionicons name="checkmark" size={18} color="#fff" style={{ zIndex: 10 }} />
@@ -369,16 +369,18 @@ const styles = StyleSheet.create({
   },
   themeScroll: {
     paddingHorizontal: 15,
+    paddingVertical: 10,
   },
   colorCircle: {
     width: 36,
     height: 36,
-    borderRadius: 18,
+    borderRadius: 999,
     marginRight: 12,
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 2,
     borderColor: 'rgba(255,255,255,0.1)',
+    overflow: 'hidden',
   },
   colorCircleActive: {
     borderColor: '#fff',
