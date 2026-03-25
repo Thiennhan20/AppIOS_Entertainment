@@ -193,15 +193,12 @@ export default function PlayerScreenTVShow({ route, navigation }: any) {
                   url={streamUrlState} 
                   isFullscreen={isFullscreen} 
                   onToggleFullscreen={toggleFullscreen}
+                  onBack={() => navigation.goBack()}
+                  title={titleState}
                   themeColor={themeColor}
                 />
               ) : (
-                <>
-                  <EmbedPlayerInline url={streamUrlState} />
-                  <TouchableOpacity style={styles.customFsBtn} onPress={toggleFullscreen}>
-                    <Ionicons name={isFullscreen ? "contract" : "expand"} size={22} color="white" />
-                  </TouchableOpacity>
-                </>
+                <EmbedPlayerInline url={streamUrlState} />
               )}
             </View>
           ) : (
