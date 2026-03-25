@@ -22,9 +22,64 @@ const { width, height } = Dimensions.get('window');
 
 
 
-function EmbedPlayerInline({ url }: { url: string }) {
+function EmbedPlayerInline({ url, onToggleFullscreen, isFullscreen }: { url: string, onToggleFullscreen: () => void, isFullscreen: boolean }) {
+  // Inject JS to intercept fullscreen calls from the web player
+  const INJECTED_JS = `
+    (function() {
+      // Overwrite video fullscreen methods
+      var overrideFullscreen = function(v) {
+        v.webkitEnterFullscreen = function() {
+           window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'toggleFullscreen' }));
+        };
+        v.requestFullscreen = function() {
+           window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'toggleFullscreen' }));
+           return Promise.resolve();
+        };
+      };
+
+      // Poll for video element
+      var checkVideo = setInterval(function() {
+        var v = document.querySelector('video');
+        if (v && !v._fullscreenOverridden) {
+          overrideFullscreen(v);
+          v._fullscreenOverridden = true;
+          clearInterval(checkVideo);
+        }
+      }, 500);
+      
+      // Fallback: Intercept clicks on buttons that look like fullscreen
+      document.addEventListener('click', function(e) {
+         if (e.target && e.target.className && typeof e.target.className === 'string') {
+            var className = e.target.className.toLowerCase();
+            if (className.includes('fullscreen') || className.includes('expand') || className.includes('fw_btn')) {
+               window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'toggleFullscreen' }));
+               e.preventDefault();
+               e.stopPropagation();
+            }
+         }
+      }, true);
+    })();
+    true;
+  `;
+
+  const onMessage = (event: any) => {
+    try {
+      const data = JSON.parse(event.nativeEvent.data);
+      if (data.type === 'toggleFullscreen') {
+        onToggleFullscreen();
+      }
+    } catch(e) {}
+  };
+
   return (
     <View style={styles.inlinePlayerContainer}>
+      {isFullscreen && (
+        <View style={styles.webViewTopBar}>
+          <TouchableOpacity onPress={onToggleFullscreen} style={{ padding: 10, marginLeft: 15 }}>
+            <Ionicons name="close" size={30} color="white" />
+          </TouchableOpacity>
+        </View>
+      )}
       <WebView
         source={{ uri: url }}
         style={styles.inlinePlayer}
@@ -33,6 +88,8 @@ function EmbedPlayerInline({ url }: { url: string }) {
         domStorageEnabled
         allowsInlineMediaPlayback={true}
         mediaPlaybackRequiresUserAction={false}
+        injectedJavaScript={INJECTED_JS}
+        onMessage={onMessage}
       />
     </View>
   );
@@ -209,7 +266,7 @@ export default function PlayerScreenMovie({ route, navigation }: any) {
                   themeColor={themeColor}
                 />
               ) : (
-                <EmbedPlayerInline url={streamUrlState} />
+                <EmbedPlayerInline url={streamUrlState} onToggleFullscreen={toggleFullscreen} isFullscreen={isFullscreen} />
               )}
             </View>
           ) : (
@@ -358,6 +415,20 @@ const styles = StyleSheet.create({
     width: '100%',
     backgroundColor: 'black',
   },
+  inlinePlayerContainer: {
+    flex: 1,
+    width: '100%',
+  },
+  inlinePlayer: {
+    flex: 1,
+    width: '100%',
+  },
+  webViewTopBar: {
+    position: 'absolute',
+    top: 5,
+    left: 10,
+    zIndex: 999,
+  },
   customFsBtn: {
     position: 'absolute',
     right: 15,
@@ -370,14 +441,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     zIndex: 9999,
   },
-  inlinePlayerContainer: {
-    flex: 1,
-    width: '100%',
-  },
-  inlinePlayer: {
-    flex: 1,
-    width: '100%',
-  },
+
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
