@@ -55,7 +55,7 @@ export default function CustomVideoPlayer({ url, isFullscreen, onToggleFullscree
     let toValue = 1;
     if (isFullscreen) {
       if (zoomLevel === 1) toValue = 1.35;
-      else if (zoomLevel === -1) toValue = 0.8;
+      else if (zoomLevel === -1) toValue = 0.9;
     }
     Animated.spring(scaleAnim, {
       toValue,
@@ -189,7 +189,7 @@ export default function CustomVideoPlayer({ url, isFullscreen, onToggleFullscree
         onTouchMove={handleTouchMove}
         onTouchEnd={handleTouchEnd}
       >
-          <Animated.View style={{ flex: 1, width: '90%', transform: [{ scale: scaleAnim }] }}>
+          <Animated.View style={{ flex: 1, width: '100%', transform: [{ scale: scaleAnim }] }}>
             <VideoView
               style={styles.video}
               player={player}
