@@ -16,41 +16,11 @@ import { useTheme } from '../../context/ThemeContext';
 import { phimApi } from '../../api/phimapi';
 import { nguoncApi } from '../../api/nguonc';
 import CustomAlert from '../../components/CustomAlert';
+import CustomVideoPlayer from '../../components/CustomVideoPlayer';
 
 const { width, height } = Dimensions.get('window');
 
-function M3U8Player({ url }: { url: string }) {
-  const player = useVideoPlayer(url, p => {
-    p.play();
-  });
 
-  useFocusEffect(
-    React.useCallback(() => {
-      // Screen is focused, we can let it play or resume if needed
-      // (The initializer above already plays it first time)
-      
-      return () => {
-        // Screen is unfocused or player unmounted. Safely pause if player still exists.
-        try {
-          player.pause();
-        } catch (e) {
-          // Ignore if the native player instance was already released
-        }
-      };
-    }, [player])
-  );
-
-  return (
-    <View style={styles.inlinePlayerContainer}>
-      <VideoView
-        style={styles.inlinePlayer}
-        player={player}
-        nativeControls={true}
-        allowsFullscreen={false}
-      />
-    </View>
-  );
-}
 
 function EmbedPlayerInline({ url }: { url: string }) {
   return (
@@ -219,13 +189,20 @@ export default function PlayerScreenTVShow({ route, navigation }: any) {
           ) : streamUrlState ? (
             <View style={{ flex: 1, width: '100%' }}>
               {activePlayerState === 'm3u8' ? (
-                <M3U8Player url={streamUrlState} />
+                <CustomVideoPlayer 
+                  url={streamUrlState} 
+                  isFullscreen={isFullscreen} 
+                  onToggleFullscreen={toggleFullscreen}
+                  themeColor={themeColor}
+                />
               ) : (
-                <EmbedPlayerInline url={streamUrlState} />
+                <>
+                  <EmbedPlayerInline url={streamUrlState} />
+                  <TouchableOpacity style={styles.customFsBtn} onPress={toggleFullscreen}>
+                    <Ionicons name={isFullscreen ? "contract" : "expand"} size={22} color="white" />
+                  </TouchableOpacity>
+                </>
               )}
-              <TouchableOpacity style={styles.customFsBtn} onPress={toggleFullscreen}>
-                <Ionicons name={isFullscreen ? "contract" : "expand"} size={22} color="white" />
-              </TouchableOpacity>
             </View>
           ) : (
             <View style={styles.loadingContainer}>
