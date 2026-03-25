@@ -131,7 +131,7 @@ export default function CustomVideoPlayer({ url, isFullscreen, onToggleFullscree
               allowsFullscreen={false}
               allowsPictureInPicture={true}
               startsPictureInPictureAutomatically={true}
-              contentFit={isFullscreen ? "cover" : "contain"}
+              contentFit="contain"
             />
         </View>
       </TouchableWithoutFeedback>
@@ -212,7 +212,6 @@ export default function CustomVideoPlayer({ url, isFullscreen, onToggleFullscree
               onSlidingComplete={handleSeek}
               minimumTrackTintColor={themeColor}
               maximumTrackTintColor="rgba(255,255,255,0.3)"
-              thumbTintColor={themeColor}
             />
             <Text style={styles.timeText}>{formatTime(duration)}</Text>
             
@@ -328,7 +327,6 @@ const styles = StyleSheet.create({
   },
   slider: {
     flex: 1,
-    height: 40,
     marginHorizontal: 10,
   },
   fullScreenBtn: {
