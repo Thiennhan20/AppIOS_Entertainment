@@ -18,6 +18,11 @@ export default function CustomVideoPlayer({ url, isFullscreen, onToggleFullscree
   const [isPlaying, setIsPlaying] = useState(true);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
+  const [playbackRate, setPlaybackRate] = useState(1);
+  const [isMuted, setIsMuted] = useState(false);
+  const [volume, setVolume] = useState(1);
+
+  const [showSpeedMenu, setShowSpeedMenu] = useState(false);
 
   const controlsTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -47,6 +52,9 @@ export default function CustomVideoPlayer({ url, isFullscreen, onToggleFullscree
         setCurrentTime(player.currentTime || 0);
         setDuration(player.duration || 0);
         setIsPlaying(player.playing);
+        setPlaybackRate(player.playbackRate || 1);
+        setIsMuted(player.muted);
+        setVolume(player.volume ?? 1);
       }
     }, 500);
     return () => clearInterval(interval);
@@ -73,10 +81,23 @@ export default function CustomVideoPlayer({ url, isFullscreen, onToggleFullscree
     resetControlsTimeout();
   };
 
+  const toggleMute = () => {
+    if (player) {
+      player.muted = !player.muted;
+      if (!player.muted && player.volume === 0) {
+        player.volume = 1;
+      }
+    }
+    resetControlsTimeout();
+  };
+
   const showControlsTemporarily = () => {
     setShowControls(prev => {
       const next = !prev;
       if (next) resetControlsTimeout();
+      else {
+         setShowSpeedMenu(false);
+      }
       return next;
     });
   };
@@ -90,8 +111,12 @@ export default function CustomVideoPlayer({ url, isFullscreen, onToggleFullscree
 
   const formatTime = (secs: number) => {
     if (isNaN(secs) || secs < 0) return '00:00';
-    const m = Math.floor(secs / 60);
+    const h = Math.floor(secs / 3600);
+    const m = Math.floor((secs % 3600) / 60);
     const s = Math.floor(secs % 60);
+    if (h > 0) {
+      return `${h}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+    }
     return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
   };
 
@@ -104,6 +129,9 @@ export default function CustomVideoPlayer({ url, isFullscreen, onToggleFullscree
               player={player}
               nativeControls={false}
               allowsFullscreen={false}
+              allowsPictureInPicture={true}
+              startsPictureInPictureAutomatically={true}
+              contentFit={isFullscreen ? "cover" : "contain"}
             />
         </View>
       </TouchableWithoutFeedback>
@@ -119,6 +147,44 @@ export default function CustomVideoPlayer({ url, isFullscreen, onToggleFullscree
           <TouchableWithoutFeedback onPress={showControlsTemporarily}>
              <View style={styles.absoluteHitbox} />
           </TouchableWithoutFeedback>
+
+          <View style={styles.topBar}>
+            <View style={styles.topLeftControls}>
+              {isFullscreen && (
+                <>
+                  <TouchableOpacity style={styles.topBtn} onPress={onToggleFullscreen}>
+                      <Ionicons name="close" size={30} color="white" />
+                  </TouchableOpacity>
+                  <TouchableOpacity style={styles.topBtn} onPress={() => {}}>
+                      <Ionicons name="albums-outline" size={24} color="white" />
+                  </TouchableOpacity>
+                </>
+              )}
+            </View>
+            <View style={{flex: 1}} />
+            <View style={styles.topRightControls}>
+                {showSpeedMenu && (
+                  <View style={styles.popupMenu}>
+                    {[0.5, 1, 1.25, 1.5, 2].map(r => (
+                      <TouchableOpacity key={r} style={styles.popupMenuItem} onPress={() => {
+                        if (player) player.playbackRate = r;
+                        setShowSpeedMenu(false);
+                        resetControlsTimeout();
+                      }}>
+                        <Text style={[styles.popupMenuText, playbackRate === r && { color: themeColor, fontWeight: 'bold' }]}>{r}x</Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                )}
+
+                <TouchableOpacity style={styles.topBtn} onPress={() => { setShowSpeedMenu(!showSpeedMenu); resetControlsTimeout(); }}>
+                    <Text style={styles.speedText}>{playbackRate}x</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.topBtn} onPress={toggleMute}>
+                    <Ionicons name={isMuted || volume === 0 ? "volume-mute" : "volume-medium"} size={26} color="white" />
+                </TouchableOpacity>
+            </View>
+          </View>
 
           <View style={styles.centerControls} pointerEvents="box-none">
             <TouchableOpacity onPress={skipBackward} style={styles.controlBtn}>
@@ -141,6 +207,7 @@ export default function CustomVideoPlayer({ url, isFullscreen, onToggleFullscree
               minimumValue={0}
               maximumValue={duration > 0 ? duration : 1}
               value={currentTime}
+              tapToSeek={true}
               onValueChange={() => { if(controlsTimeoutRef.current) clearTimeout(controlsTimeoutRef.current); }}
               onSlidingComplete={handleSeek}
               minimumTrackTintColor={themeColor}
@@ -183,6 +250,57 @@ const styles = StyleSheet.create({
   absoluteHitbox: {
     ...StyleSheet.absoluteFillObject,
   },
+  topBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    width: '100%',
+    paddingTop: 15,
+    paddingHorizontal: 15,
+    position: 'absolute',
+    top: 0,
+    zIndex: 10,
+  },
+  topLeftControls: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  topRightControls: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    position: 'relative',
+    paddingBottom: 10,
+  },
+  popupMenu: {
+    position: 'absolute',
+    top: 50,
+    right: 50,
+    backgroundColor: 'rgba(20,20,20,0.95)',
+    borderRadius: 8,
+    padding: 5,
+    minWidth: 70,
+    zIndex: 20,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.1)',
+  },
+  popupMenuItem: {
+    paddingVertical: 10,
+    alignItems: 'center',
+  },
+  popupMenuText: {
+    color: 'white',
+    fontSize: 14,
+  },
+  topBtn: {
+    padding: 10,
+    marginLeft: 15,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  speedText: {
+    color: 'white',
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
   centerControls: {
     ...StyleSheet.absoluteFillObject,
     flexDirection: 'row',
@@ -205,7 +323,7 @@ const styles = StyleSheet.create({
     color: 'white',
     fontSize: 12,
     fontWeight: '700',
-    width: 45,
+    minWidth: 45,
     textAlign: 'center',
   },
   slider: {
