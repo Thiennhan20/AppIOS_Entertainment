@@ -23,8 +23,11 @@ export default function CustomVideoPlayer({ url, isFullscreen, onToggleFullscree
   const [volume, setVolume] = useState(1);
 
   const [showSpeedMenu, setShowSpeedMenu] = useState(false);
+  const [isZoomed, setIsZoomed] = useState(false);
 
   const controlsTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const initialPinchDistRef = useRef<number | null>(null);
+  const hasPinchedRef = useRef<boolean>(false);
 
   const player = useVideoPlayer(url, p => {
     p.loop = false;
@@ -102,6 +105,44 @@ export default function CustomVideoPlayer({ url, isFullscreen, onToggleFullscree
     });
   };
 
+  const getDistance = (touches: any) => {
+    const dx = touches[0].pageX - touches[1].pageX;
+    const dy = touches[0].pageY - touches[1].pageY;
+    return Math.sqrt(dx * dx + dy * dy);
+  };
+
+  const handleTouchStart = (e: any) => {
+    if (e.nativeEvent.touches.length === 2 && isFullscreen) {
+      initialPinchDistRef.current = getDistance(e.nativeEvent.touches);
+      hasPinchedRef.current = true;
+    } else if (e.nativeEvent.touches.length === 1) {
+      hasPinchedRef.current = false;
+    }
+  };
+
+  const handleTouchMove = (e: any) => {
+    if (e.nativeEvent.touches.length === 2 && initialPinchDistRef.current !== null && isFullscreen) {
+      const currentDist = getDistance(e.nativeEvent.touches);
+      const ratio = currentDist / initialPinchDistRef.current;
+      
+      if (ratio > 1.2 && !isZoomed) {
+         setIsZoomed(true);
+      } else if (ratio < 0.8 && isZoomed) {
+         setIsZoomed(false);
+      }
+    }
+  };
+
+  const handleTouchEnd = (e: any) => {
+    if (e.nativeEvent.touches.length === 0) {
+      if (!hasPinchedRef.current) {
+        showControlsTemporarily();
+      }
+      initialPinchDistRef.current = null;
+      hasPinchedRef.current = false;
+    }
+  };
+
   const resetControlsTimeout = () => {
     if (controlsTimeoutRef.current) clearTimeout(controlsTimeoutRef.current);
     controlsTimeoutRef.current = setTimeout(() => {
@@ -122,8 +163,12 @@ export default function CustomVideoPlayer({ url, isFullscreen, onToggleFullscree
 
   return (
     <View style={styles.container}>
-      <TouchableWithoutFeedback onPress={showControlsTemporarily}>
-        <View style={styles.videoWrapper}>
+      <View 
+        style={styles.videoWrapper}
+        onTouchStart={handleTouchStart}
+        onTouchMove={handleTouchMove}
+        onTouchEnd={handleTouchEnd}
+      >
             <VideoView
               style={styles.video}
               player={player}
@@ -131,10 +176,9 @@ export default function CustomVideoPlayer({ url, isFullscreen, onToggleFullscree
               allowsFullscreen={false}
               allowsPictureInPicture={true}
               startsPictureInPictureAutomatically={true}
-              contentFit="contain"
+              contentFit={isFullscreen && isZoomed ? "cover" : "contain"}
             />
-        </View>
-      </TouchableWithoutFeedback>
+      </View>
 
       {showControls && (
         <View style={styles.overlay} pointerEvents="box-none">
@@ -144,9 +188,12 @@ export default function CustomVideoPlayer({ url, isFullscreen, onToggleFullscree
             pointerEvents="none"
           />
           
-          <TouchableWithoutFeedback onPress={showControlsTemporarily}>
-             <View style={styles.absoluteHitbox} />
-          </TouchableWithoutFeedback>
+          <View 
+            style={styles.absoluteHitbox} 
+            onTouchStart={handleTouchStart}
+            onTouchMove={handleTouchMove}
+            onTouchEnd={handleTouchEnd}
+          />
 
           <View style={styles.topBar}>
             <View style={styles.topLeftControls}>
