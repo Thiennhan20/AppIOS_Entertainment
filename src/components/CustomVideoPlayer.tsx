@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, TouchableWithoutFeedback } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, TouchableWithoutFeedback, Animated } from 'react-native';
 import { useVideoPlayer, VideoView } from 'expo-video';
 import { Ionicons } from '@expo/vector-icons';
 import Slider from '@react-native-community/slider';
@@ -24,6 +24,8 @@ export default function CustomVideoPlayer({ url, isFullscreen, onToggleFullscree
 
   const [showSpeedMenu, setShowSpeedMenu] = useState(false);
   const [zoomLevel, setZoomLevel] = useState(0); // -1 (small), 0 (medium - default), 1 (large)
+  
+  const scaleAnim = useRef(new Animated.Value(1)).current;
 
   const controlsTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const initialPinchDistRef = useRef<number | null>(null);
@@ -48,6 +50,20 @@ export default function CustomVideoPlayer({ url, isFullscreen, onToggleFullscree
   useEffect(() => {
     resetControlsTimeout();
   }, []);
+
+  useEffect(() => {
+    let toValue = 1;
+    if (isFullscreen) {
+      if (zoomLevel === 1) toValue = 1.35;
+      else if (zoomLevel === -1) toValue = 0.8;
+    }
+    Animated.spring(scaleAnim, {
+      toValue,
+      useNativeDriver: true,
+      bounciness: 6,
+      speed: 12,
+    }).start();
+  }, [zoomLevel, isFullscreen]);
 
   useEffect(() => {
     const interval = setInterval(() => {
@@ -168,20 +184,22 @@ export default function CustomVideoPlayer({ url, isFullscreen, onToggleFullscree
   return (
     <View style={styles.container}>
       <View 
-        style={styles.videoWrapper}
+        style={[styles.videoWrapper, { overflow: 'hidden' }]}
         onTouchStart={handleTouchStart}
         onTouchMove={handleTouchMove}
         onTouchEnd={handleTouchEnd}
       >
+          <Animated.View style={{ flex: 1, width: '90%', transform: [{ scale: scaleAnim }] }}>
             <VideoView
-              style={[styles.video, isFullscreen && zoomLevel === -1 && { transform: [{ scale: 0.75 }] }]}
+              style={styles.video}
               player={player}
               nativeControls={false}
               allowsFullscreen={false}
               allowsPictureInPicture={true}
               startsPictureInPictureAutomatically={true}
-              contentFit={isFullscreen && zoomLevel === 1 ? "cover" : "contain"}
+              contentFit="contain"
             />
+          </Animated.View>
       </View>
 
       {showControls && (
