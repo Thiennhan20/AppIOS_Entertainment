@@ -4,6 +4,8 @@ import {
   ActivityIndicator, ScrollView, Modal, TextInput, KeyboardAvoidingView, Platform, Alert
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import * as ScreenOrientation from 'expo-screen-orientation';
+import { StatusBar } from 'expo-status-bar';
 import { useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
@@ -44,7 +46,7 @@ function M3U8Player({ url }: { url: string }) {
         style={styles.inlinePlayer}
         player={player}
         nativeControls={true}
-        // Removed allowsFullscreen to fix the deprecation warning
+        allowsFullscreen={false}
       />
     </View>
   );
@@ -57,7 +59,7 @@ function EmbedPlayerInline({ url }: { url: string }) {
         source={{ uri: url }}
         style={styles.inlinePlayer}
         javaScriptEnabled
-        allowsFullscreenVideo
+        allowsFullscreenVideo={false}
         domStorageEnabled
         allowsInlineMediaPlayback={true}
         mediaPlaybackRequiresUserAction={false}
@@ -97,6 +99,24 @@ export default function PlayerScreenTVShow({ route, navigation }: any) {
     message: '',
     isError: false,
   });
+
+  const [isFullscreen, setIsFullscreen] = useState(false);
+
+  const toggleFullscreen = async () => {
+    if (isFullscreen) {
+      await ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.PORTRAIT_UP);
+      setIsFullscreen(false);
+    } else {
+      await ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.LANDSCAPE);
+      setIsFullscreen(true);
+    }
+  };
+
+  useEffect(() => {
+    return () => {
+      ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.PORTRAIT_UP);
+    };
+  }, []);
 
   const showAlert = (title: string, message: string, isError: boolean = false) => {
     setAlertInfo({ visible: true, title, message, isError });
@@ -174,102 +194,111 @@ export default function PlayerScreenTVShow({ route, navigation }: any) {
   };
 
   return (
-    <View style={{ flex: 1 }}>
+    <View style={{ flex: 1, backgroundColor: '#0f0f13' }}>
+      <StatusBar hidden={isFullscreen} />
       <KeyboardAvoidingView 
         style={[styles.container, { paddingBottom: 0 }]} 
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       >
-      <View style={{ paddingTop: insets.top }}>
-        <View style={styles.header}>
-          <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-            <Ionicons name="arrow-back" size={24} color="white" />
-          </TouchableOpacity>
-          <Text style={styles.headerTitle} numberOfLines={1}>{titleState}</Text>
-        </View>
+      <View style={{ flex: 1, paddingTop: isFullscreen ? 0 : insets.top }}>
+        {!isFullscreen && (
+          <View style={styles.header}>
+            <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
+              <Ionicons name="arrow-back" size={24} color="white" />
+            </TouchableOpacity>
+            <Text style={styles.headerTitle} numberOfLines={1}>{titleState}</Text>
+          </View>
+        )}
 
-        <View style={styles.playerWrapper}>
+        <View style={isFullscreen ? styles.fullscreenPlayerWrapper : styles.playerWrapper}>
           {loadingStream ? (
             <View style={styles.loadingContainer}>
               <ActivityIndicator size="large" color={themeColor} />
               <Text style={{color:'white', marginTop:10}}>Loading...</Text>
             </View>
           ) : streamUrlState ? (
-            activePlayerState === 'm3u8' ? (
-              <M3U8Player url={streamUrlState} />
-            ) : (
-              <EmbedPlayerInline url={streamUrlState} />
-            )
+            <View style={{ flex: 1, width: '100%' }}>
+              {activePlayerState === 'm3u8' ? (
+                <M3U8Player url={streamUrlState} />
+              ) : (
+                <EmbedPlayerInline url={streamUrlState} />
+              )}
+              <TouchableOpacity style={styles.customFsBtn} onPress={toggleFullscreen}>
+                <Ionicons name={isFullscreen ? "contract" : "expand"} size={22} color="white" />
+              </TouchableOpacity>
+            </View>
           ) : (
             <View style={styles.loadingContainer}>
               <Text style={{color:'gray'}}>{t('player.error_loading_stream', { defaultValue: 'Movie unavailable' })}</Text>
             </View>
           )}
         </View>
-      </View>
 
-      <ScrollView style={{ flex: 1 }} keyboardShouldPersistTaps="handled">
-        <View style={styles.controlsRow}>
-          {isTV && (
-            <View style={styles.episodesRow}>
-               <TouchableOpacity style={styles.epSelectorBtn} onPress={() => setShowSeasonPicker(true)}>
-                 <Text style={styles.epSelectorBtnText}>{t('general.season', { defaultValue: 'Season' })} {selectedSeason}</Text>
-                 <Ionicons name="chevron-down" size={16} color="#aaa" />
-               </TouchableOpacity>
+        {!isFullscreen && (
+          <ScrollView style={{ flex: 1 }} keyboardShouldPersistTaps="handled">
+            <View style={styles.controlsRow}>
+              {isTV && (
+                <View style={styles.episodesRow}>
+                   <TouchableOpacity style={styles.epSelectorBtn} onPress={() => setShowSeasonPicker(true)}>
+                     <Text style={styles.epSelectorBtnText}>{t('general.season', { defaultValue: 'Season' })} {selectedSeason}</Text>
+                     <Ionicons name="chevron-down" size={16} color="#aaa" />
+                   </TouchableOpacity>
 
-               <TouchableOpacity style={[styles.epSelectorBtn, { marginLeft: 10 }]} onPress={() => setShowEpisodePicker(true)}>
-                 <Text style={styles.epSelectorBtnText}>{t('general.episode', { defaultValue: 'Episode' })} {selectedEpisode}</Text>
-                 <Ionicons name="chevron-down" size={16} color="#aaa" />
-               </TouchableOpacity>
+                   <TouchableOpacity style={[styles.epSelectorBtn, { marginLeft: 10 }]} onPress={() => setShowEpisodePicker(true)}>
+                     <Text style={styles.epSelectorBtnText}>{t('general.episode', { defaultValue: 'Episode' })} {selectedEpisode}</Text>
+                     <Ionicons name="chevron-down" size={16} color="#aaa" />
+                   </TouchableOpacity>
+                </View>
+              )}
             </View>
-          )}
-        </View>
 
-        <View style={styles.controlsRow}>
-          <TouchableOpacity 
-            style={styles.toggleCommentBtn} 
-            onPress={() => setCommentsVisible(!commentsVisible)}
-          >
-            <Ionicons name={commentsVisible ? 'chatbubble-outline' : 'chatbubbles'} size={20} color="white" />
-            <Text style={styles.toggleCommentText}>
-              {commentsVisible ? t('player.close_comments', { defaultValue: 'Close Comments' }) : t('player.open_comments', { defaultValue: 'Open Comments' })}
-            </Text>
-            <Ionicons name={commentsVisible ? "chevron-up" : "chevron-down"} size={16} color="gray" style={{marginLeft: 8}} />
-          </TouchableOpacity>
-        </View>
+            <View style={styles.controlsRow}>
+              <TouchableOpacity 
+                style={styles.toggleCommentBtn} 
+                onPress={() => setCommentsVisible(!commentsVisible)}
+              >
+                <Ionicons name={commentsVisible ? 'chatbubble-outline' : 'chatbubbles'} size={20} color="white" />
+                <Text style={styles.toggleCommentText}>
+                  {commentsVisible ? t('player.close_comments', { defaultValue: 'Close Comments' }) : t('player.open_comments', { defaultValue: 'Open Comments' })}
+                </Text>
+                <Ionicons name={commentsVisible ? "chevron-up" : "chevron-down"} size={16} color="gray" style={{marginLeft: 8}} />
+              </TouchableOpacity>
+            </View>
 
-        {commentsVisible && (
-          <View style={styles.commentsContainer}>
-            <Text style={styles.commentsHeader}>{t('player.comments')}</Text>
-            {comments.map((c, i) => (
-              <View key={i} style={styles.commentItem}>
-                <View style={styles.commentAvatar}>
-                  <Text style={{color:'white', fontWeight:'bold'}}>{c.user.charAt(0)}</Text>
-                </View>
-                <View style={styles.commentBody}>
-                  <Text style={styles.commentUser}>{c.user}</Text>
-                  <Text style={styles.commentText}>{c.text}</Text>
-                </View>
+            {commentsVisible && (
+              <View style={styles.commentsContainer}>
+                <Text style={styles.commentsHeader}>{t('player.comments')}</Text>
+                {comments.map((c, i) => (
+                  <View key={i} style={styles.commentItem}>
+                    <View style={styles.commentAvatar}>
+                      <Text style={{color:'white', fontWeight:'bold'}}>{c.user.charAt(0)}</Text>
+                    </View>
+                    <View style={styles.commentBody}>
+                      <Text style={styles.commentUser}>{c.user}</Text>
+                      <Text style={styles.commentText}>{c.text}</Text>
+                    </View>
+                  </View>
+                ))}
               </View>
-            ))}
+            )}
+          </ScrollView>
+        )}
+
+        {!isFullscreen && commentsVisible && (
+          <View style={[styles.inputContainer, { paddingBottom: insets.bottom || 10 }]}>
+            <TextInput 
+              style={styles.textInput}
+              placeholder={t('player.write_comment', { defaultValue: 'Write a comment...' })}
+              placeholderTextColor="#666"
+              value={newComment}
+              onChangeText={setNewComment}
+            />
+            <TouchableOpacity style={[styles.sendButton, { backgroundColor: themeColor }]} onPress={addComment}>
+              <Ionicons name="send" size={20} color="white" />
+            </TouchableOpacity>
           </View>
         )}
-      </ScrollView>
-
-      {commentsVisible && (
-        <View style={[styles.inputContainer, { paddingBottom: insets.bottom || 10 }]}>
-          <TextInput 
-            style={styles.textInput}
-            placeholder={t('player.write_comment', { defaultValue: 'Write a comment...' })}
-            placeholderTextColor="#666"
-            value={newComment}
-            onChangeText={setNewComment}
-          />
-          <TouchableOpacity style={[styles.sendButton, { backgroundColor: themeColor }]} onPress={addComment}>
-            <Ionicons name="send" size={20} color="white" />
-          </TouchableOpacity>
-        </View>
-      )}
-
+      </View>
     </KeyboardAvoidingView>
 
       <Modal visible={showSeasonPicker} transparent animationType="fade">
@@ -335,9 +364,26 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   playerWrapper: {
-    width: width,
+    width: '100%',
     aspectRatio: 16 / 9,
     backgroundColor: 'black',
+  },
+  fullscreenPlayerWrapper: {
+    flex: 1,
+    width: '100%',
+    backgroundColor: 'black',
+  },
+  customFsBtn: {
+    position: 'absolute',
+    right: 15,
+    bottom: 15,
+    width: 40,
+    height: 40,
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    borderRadius: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 9999,
   },
   inlinePlayerContainer: {
     flex: 1,

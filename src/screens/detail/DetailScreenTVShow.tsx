@@ -569,20 +569,19 @@ const styles = StyleSheet.create({
     fontSize: 12, marginRight: 10,
   },
   playControlsRow: {
-    flexDirection: 'row',
-    marginBottom: 20,
-    alignItems: 'center',
-    justifyContent: 'space-between',
+    flexDirection: 'column',
+    marginBottom: 25,
+    width: '100%',
   },
   playButtonFull: {
     backgroundColor: 'white',
     flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
-    paddingVertical: 10,
+    paddingVertical: 12,
     borderRadius: 6,
-    flex: 1,
-    marginRight: 20,
+    width: '100%',
+    marginBottom: 20,
   },
   playButtonText: {
     color: 'black',
@@ -620,13 +619,12 @@ const styles = StyleSheet.create({
   },
   actionRowMini: {
     flexDirection: 'row',
-    alignItems: 'flex-start',
+    justifyContent: 'space-around',
+    width: '100%',
   },
   actionItemMini: {
     alignItems: 'center',
     justifyContent: 'flex-start',
-    marginHorizontal: 10,
-    minWidth: 50,
   },
   actionItemTextMini: {
     color: '#ccc',

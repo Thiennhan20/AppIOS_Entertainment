@@ -180,8 +180,6 @@ const styles = StyleSheet.create({
   actionItemMini: {
     alignItems: 'center',
     justifyContent: 'flex-start',
-    marginHorizontal: 10,
-    minWidth: 50,
   },
   actionItemTextMini: {
     color: '#ccc',
