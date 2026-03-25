@@ -23,7 +23,7 @@ export default function CustomVideoPlayer({ url, isFullscreen, onToggleFullscree
   const [volume, setVolume] = useState(1);
 
   const [showSpeedMenu, setShowSpeedMenu] = useState(false);
-  const [isZoomed, setIsZoomed] = useState(false);
+  const [zoomLevel, setZoomLevel] = useState(0); // -1 (small), 0 (medium - default), 1 (large)
 
   const controlsTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const initialPinchDistRef = useRef<number | null>(null);
@@ -125,10 +125,14 @@ export default function CustomVideoPlayer({ url, isFullscreen, onToggleFullscree
       const currentDist = getDistance(e.nativeEvent.touches);
       const ratio = currentDist / initialPinchDistRef.current;
       
-      if (ratio > 1.2 && !isZoomed) {
-         setIsZoomed(true);
-      } else if (ratio < 0.8 && isZoomed) {
-         setIsZoomed(false);
+      if (ratio > 1.2) {
+         if (zoomLevel === -1) setZoomLevel(0);
+         else if (zoomLevel === 0) setZoomLevel(1);
+         initialPinchDistRef.current = currentDist; // reset baseline
+      } else if (ratio < 0.8) {
+         if (zoomLevel === 1) setZoomLevel(0);
+         else if (zoomLevel === 0) setZoomLevel(-1);
+         initialPinchDistRef.current = currentDist; // reset baseline
       }
     }
   };
@@ -170,13 +174,13 @@ export default function CustomVideoPlayer({ url, isFullscreen, onToggleFullscree
         onTouchEnd={handleTouchEnd}
       >
             <VideoView
-              style={styles.video}
+              style={[styles.video, isFullscreen && zoomLevel === -1 && { transform: [{ scale: 0.75 }] }]}
               player={player}
               nativeControls={false}
               allowsFullscreen={false}
               allowsPictureInPicture={true}
               startsPictureInPictureAutomatically={true}
-              contentFit={isFullscreen && isZoomed ? "cover" : "contain"}
+              contentFit={isFullscreen && zoomLevel === 1 ? "cover" : "contain"}
             />
       </View>
 
