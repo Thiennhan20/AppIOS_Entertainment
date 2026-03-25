@@ -10,12 +10,10 @@ interface CustomVideoPlayerProps {
   url: string;
   isFullscreen: boolean;
   onToggleFullscreen: () => void;
-  onBack: () => void;
-  title: string;
   themeColor: string;
 }
 
-export default function CustomVideoPlayer({ url, isFullscreen, onToggleFullscreen, onBack, title, themeColor }: CustomVideoPlayerProps) {
+export default function CustomVideoPlayer({ url, isFullscreen, onToggleFullscreen, themeColor }: CustomVideoPlayerProps) {
   const [showControls, setShowControls] = useState(true);
   const [isPlaying, setIsPlaying] = useState(true);
   const [currentTime, setCurrentTime] = useState(0);
@@ -122,13 +120,6 @@ export default function CustomVideoPlayer({ url, isFullscreen, onToggleFullscree
              <View style={styles.absoluteHitbox} />
           </TouchableWithoutFeedback>
 
-          <View style={styles.topBar}>
-            <TouchableOpacity onPress={onBack} style={styles.backBtn}>
-              <Ionicons name="arrow-back" size={28} color="white" />
-            </TouchableOpacity>
-            <Text style={styles.videoTitle} numberOfLines={1}>{title}</Text>
-          </View>
-
           <View style={styles.centerControls} pointerEvents="box-none">
             <TouchableOpacity onPress={skipBackward} style={styles.controlBtn}>
               <Ionicons name="play-back" size={42} color="white" />
@@ -191,26 +182,6 @@ const styles = StyleSheet.create({
   },
   absoluteHitbox: {
     ...StyleSheet.absoluteFillObject,
-  },
-  topBar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    width: '100%',
-    paddingTop: 15,
-    paddingHorizontal: 15,
-    position: 'absolute',
-    top: 0,
-    zIndex: 10,
-  },
-  backBtn: {
-    padding: 5,
-    marginRight: 10,
-  },
-  videoTitle: {
-    color: 'white',
-    fontSize: 16,
-    fontWeight: 'bold',
-    flex: 1,
   },
   centerControls: {
     ...StyleSheet.absoluteFillObject,

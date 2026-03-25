@@ -72,6 +72,19 @@ export default function PlayerScreenTVShow({ route, navigation }: any) {
 
   const [isFullscreen, setIsFullscreen] = useState(false);
 
+  useFocusEffect(
+    React.useCallback(() => {
+      navigation.getParent()?.setOptions({
+        tabBarStyle: { display: isFullscreen ? 'none' : 'flex' },
+      });
+      return () => {
+        navigation.getParent()?.setOptions({
+          tabBarStyle: { display: 'flex' },
+        });
+      };
+    }, [navigation, isFullscreen])
+  );
+
   const toggleFullscreen = async () => {
     if (isFullscreen) {
       await ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.PORTRAIT_UP);
@@ -193,8 +206,6 @@ export default function PlayerScreenTVShow({ route, navigation }: any) {
                   url={streamUrlState} 
                   isFullscreen={isFullscreen} 
                   onToggleFullscreen={toggleFullscreen}
-                  onBack={() => navigation.goBack()}
-                  title={titleState}
                   themeColor={themeColor}
                 />
               ) : (

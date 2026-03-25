@@ -47,6 +47,14 @@ export function AnimatedTabBar({ state, descriptors, navigation }: any) {
 
   }, [state.index]);
 
+  const activeRoute = state.routes[state.index];
+  const activeDescriptors = descriptors[activeRoute.key];
+  const activeTabBarStyle = activeDescriptors.options.tabBarStyle;
+
+  if (activeTabBarStyle?.display === 'none') {
+    return null;
+  }
+
   return (
     <View style={[styles.container, { paddingBottom: insets.bottom + 10 }]}>
       
