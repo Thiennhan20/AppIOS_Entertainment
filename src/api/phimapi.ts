@@ -215,15 +215,15 @@ export const phimApi = {
                episodeData = serverGroup.server_data[0];
             }
 
-            let m3u8Link = episodeData?.link_m3u8;
-            if (m3u8Link && m3u8Link.includes('?url=')) {
-              m3u8Link = m3u8Link.split('?url=')[1];
+            let streamUrl = episodeData?.link_embed || episodeData?.link_m3u8;
+            if (streamUrl && streamUrl.includes('?url=')) {
+              streamUrl = streamUrl.split('?url=')[1];
             }
-            if (m3u8Link) {
+            if (streamUrl) {
               results.push({
                 id: `server1_${index}`,
                 name: serverGroup.server_name || `Track ${index + 1}`,
-                url: m3u8Link
+                url: streamUrl
               });
             }
           }

@@ -179,14 +179,15 @@ const styles = StyleSheet.create({
   // detail
   actionItemMini: {
     alignItems: 'center',
-    justifyContent: 'center',
-    marginHorizontal: 12,
-    minWidth: 44,
+    justifyContent: 'flex-start',
+    marginHorizontal: 10,
+    minWidth: 50,
   },
   actionItemTextMini: {
     color: '#ccc',
-    fontSize: 12,
+    fontSize: 11,
     marginTop: 6,
     fontWeight: '500',
+    textAlign: 'center',
   },
 });

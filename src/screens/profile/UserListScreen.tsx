@@ -58,7 +58,7 @@ export default function UserListScreen({ route, navigation }: any) {
 
     const handleLongPress = () => {
       if (type === 'watchlist') {
-        Vibration.vibrate(40);
+
         setLongPressedMovie({ ...item, isTV });
       }
     };

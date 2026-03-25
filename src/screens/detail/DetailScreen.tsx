@@ -1,6 +1,6 @@
 import React from 'react';
-import DetailScreenMovie from './detail/DetailScreenMovie';
-import DetailScreenTVShow from './detail/DetailScreenTVShow';
+import DetailScreenMovie from './DetailScreenMovie';
+import DetailScreenTVShow from './DetailScreenTVShow';
 
 export default function DetailScreen({ route, navigation }: any) {
   const isTV = route.params?.isTV || route.params?.item?.isTV || route.params?.item?.name ? true : false;

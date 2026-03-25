@@ -47,11 +47,10 @@ export default function CustomAlert({
           <TouchableWithoutFeedback>
             <View style={styles.modalContent}>
               
-              <View style={[styles.modalIconContainer, { backgroundColor: `${mainColor}1A` }]}>
-                <Ionicons name={finalIcon} size={32} color={mainColor} />
+              <View style={styles.titleRow}>
+                <Ionicons name={finalIcon} size={24} color={mainColor} />
+                <Text style={styles.modalTitle}>{title}</Text>
               </View>
-              
-              <Text style={styles.modalTitle}>{title}</Text>
               
               {message ? (
                 <Text style={styles.modalMessage}>{message}</Text>
@@ -90,16 +89,15 @@ export default function CustomAlert({
 const styles = StyleSheet.create({
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.75)',
+    backgroundColor: 'rgba(0, 0, 0, 0.7)',
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 30, // Reduced from 20 to ensure it's not too wide like full width modals
   },
   modalContent: {
     backgroundColor: '#1E1E1E',
-    width: '100%',
-    borderRadius: 16,
-    padding: 24,
+    width: 300,
+    borderRadius: 12,
+    padding: 20,
     alignItems: 'center',
     borderWidth: 1,
     borderColor: '#333',
@@ -109,20 +107,18 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.5,
     shadowRadius: 10,
   },
-  modalIconContainer: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
-    justifyContent: 'center',
+  titleRow: {
+    flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 16,
+    marginBottom: 12,
+    justifyContent: 'center',
+    width: '100%',
   },
   modalTitle: {
     color: '#fff',
-    fontSize: 20,
+    fontSize: 18,
     fontWeight: 'bold',
-    marginBottom: 8,
-    textAlign: 'center',
+    marginLeft: 8,
   },
   modalMessage: {
     color: '#aaa',
@@ -138,7 +134,7 @@ const styles = StyleSheet.create({
   },
   modalCancelBtn: {
     flex: 1,
-    height: 48,
+    height: 40,
     backgroundColor: '#333',
     borderRadius: 8,
     justifyContent: 'center',
@@ -147,19 +143,19 @@ const styles = StyleSheet.create({
   },
   modalCancelBtnText: {
     color: '#fff',
-    fontSize: 16,
+    fontSize: 14,
     fontWeight: '600',
   },
   modalConfirmBtn: {
     flex: 1,
-    height: 48,
+    height: 40,
     borderRadius: 8,
     justifyContent: 'center',
     alignItems: 'center',
   },
   modalConfirmBtnText: {
     color: '#fff',
-    fontSize: 16,
+    fontSize: 14,
     fontWeight: 'bold',
   },
 });

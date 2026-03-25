@@ -71,7 +71,7 @@ export default function ListScreen({ route, navigation }: any) {
         style={styles.card}
         onPress={() => navigation.navigate('DetailScreen', { item, isTV })}
         onLongPress={() => {
-          Vibration.vibrate(40);
+
           setLongPressedMovie({ ...item, isTV });
         }}
         delayLongPress={400}

@@ -10,9 +10,10 @@ import { useTranslation } from 'react-i18next';
 import { useVideoPlayer, VideoView } from 'expo-video';
 import { WebView } from 'react-native-webview';
 
-import { useTheme } from '../context/ThemeContext';
-import { phimApi } from '../api/phimapi';
-import { nguoncApi } from '../api/nguonc';
+import { useTheme } from '../../context/ThemeContext';
+import { phimApi } from '../../api/phimapi';
+import { nguoncApi } from '../../api/nguonc';
+import CustomAlert from '../../components/CustomAlert';
 
 const { width, height } = Dimensions.get('window');
 
@@ -58,6 +59,8 @@ function EmbedPlayerInline({ url }: { url: string }) {
         javaScriptEnabled
         allowsFullscreenVideo
         domStorageEnabled
+        allowsInlineMediaPlayback={true}
+        mediaPlaybackRequiresUserAction={false}
       />
     </View>
   );
@@ -88,6 +91,17 @@ export default function PlayerScreenMovie({ route, navigation }: any) {
   const [comments, setComments] = useState<any[]>([]);
   const [newComment, setNewComment] = useState('');
 
+  const [alertInfo, setAlertInfo] = useState({
+    visible: false,
+    title: '',
+    message: '',
+    isError: false,
+  });
+
+  const showAlert = (title: string, message: string, isError: boolean = false) => {
+    setAlertInfo({ visible: true, title, message, isError });
+  };
+
   const availableSeasons = seasons?.filter((s:any) => s.season_number > 0) || [{ season_number: 1, name: 'Season 1', episode_count: 50 }];
   const currentSeasonData = availableSeasons.find((s:any) => s.season_number === selectedSeason) || availableSeasons[0];
   const episodeCount = currentSeasonData?.episode_count || 50;
@@ -95,8 +109,8 @@ export default function PlayerScreenMovie({ route, navigation }: any) {
 
   const formatTitle = (epNum: number, seasonNum: number, trackName?: string) => {
     const baseTitle = item?.title || item?.name || 'Unknown Title';
-    if (!isTV) return trackName ? `${baseTitle} (${trackName})` : baseTitle;
-    return trackName ? `${baseTitle} - S${seasonNum} E${epNum} (${trackName})` : `${baseTitle} - S${seasonNum} E${epNum}`;
+    if (!isTV) return baseTitle;
+    return `${baseTitle} - S${seasonNum} E${epNum}`;
   };
 
   const changeEpisode = async (epNum: number, seasonNum: number) => {
@@ -121,13 +135,13 @@ export default function PlayerScreenMovie({ route, navigation }: any) {
           
           if (streamObj && streamObj.url) {
             setStreamUrlState(streamObj.url);
-            setActivePlayerState('m3u8');
+            setActivePlayerState(streamObj.url.includes('.m3u8') ? 'm3u8' : 'embed');
             setTitleState(formatTitle(epNum, seasonNum, streamObj.name));
           } else {
-            Alert.alert(t('general.notice'), t('player.stream_not_on_server_1', { defaultValue: 'Stream unavailable on Server 1' }));
+            showAlert(t('general.notice'), t('player.stream_not_on_server_1', { defaultValue: 'Movie not available on Server 1.\nPlease try Server 3.' }));
           }
         } else {
-          Alert.alert(t('general.notice'), t('player.stream_not_on_server_1', { defaultValue: 'Stream unavailable on Server 1' }));
+          showAlert(t('general.notice'), t('player.stream_not_on_server_1', { defaultValue: 'Movie not available on Server 1.\nPlease try Server 3.' }));
         }
       } else {
         const links = await nguoncApi.getStreamingLink(isTV, baseTitle, parseInt(year), '', seasonNum, epNum);
@@ -139,14 +153,14 @@ export default function PlayerScreenMovie({ route, navigation }: any) {
              setActivePlayerState(finalUrl.includes('.m3u8') ? 'm3u8' : 'embed');
              setTitleState(formatTitle(epNum, seasonNum));
           } else {
-             Alert.alert(t('general.notice'), t('player.stream_not_on_server_3', { defaultValue: 'Stream unavailable' }));
+             showAlert(t('general.notice'), t('player.stream_not_on_server_3', { defaultValue: 'Movie unavailable on Server 3.\nPlease try Server 1.' }));
           }
         } else {
-          Alert.alert(t('general.notice'), t('player.stream_not_on_server_3', { defaultValue: 'Stream unavailable' }));
+          showAlert(t('general.notice'), t('player.stream_not_on_server_3', { defaultValue: 'Movie unavailable on Server 3.\nPlease try Server 1.' }));
         }
       }
     } catch(e) {
-      Alert.alert(t('general.notice'), t('player.error_loading_stream', { defaultValue: 'Failed to load stream link.' }));
+      showAlert(t('general.error', { defaultValue: 'Error' }), t('player.error_loading_stream', { defaultValue: 'Failed to load movie link.\nPlease try again later.' }), true);
     } finally {
       setLoadingStream(false);
     }
@@ -177,7 +191,7 @@ export default function PlayerScreenMovie({ route, navigation }: any) {
           {loadingStream ? (
             <View style={styles.loadingContainer}>
               <ActivityIndicator size="large" color={themeColor} />
-              <Text style={{color:'white', marginTop:10}}>Loading stream...</Text>
+              <Text style={{color:'white', marginTop:10}}>Loading...</Text>
             </View>
           ) : streamUrlState ? (
             activePlayerState === 'm3u8' ? (
@@ -187,7 +201,7 @@ export default function PlayerScreenMovie({ route, navigation }: any) {
             )
           ) : (
             <View style={styles.loadingContainer}>
-              <Text style={{color:'gray'}}>{t('player.error_loading_stream', { defaultValue: 'Stream unavailable' })}</Text>
+              <Text style={{color:'gray'}}>{t('player.error_loading_stream', { defaultValue: 'Movie unavailable' })}</Text>
             </View>
           )}
         </View>
@@ -289,6 +303,16 @@ export default function PlayerScreenMovie({ route, navigation }: any) {
           </View>
         </TouchableOpacity>
       </Modal>
+
+      {/* Custom Alert */}
+      <CustomAlert
+        visible={alertInfo.visible}
+        title={alertInfo.title}
+        message={alertInfo.message}
+        isError={alertInfo.isError}
+        onClose={() => setAlertInfo(prev => ({ ...prev, visible: false }))}
+      />
+
     </View>
   );
 }

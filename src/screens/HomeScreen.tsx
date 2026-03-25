@@ -499,7 +499,7 @@ export default function HomeScreen({ navigation }: any) {
     const navIsTV = isHistory ? item.isTVShow : (isWatchlist ? (item.type === 'tv') : isTV);
 
     const handleLongPressMovie = () => {
-      Vibration.vibrate(40);
+
       setLongPressedMovie({ ...navItem, isTV: navIsTV });
     };
 

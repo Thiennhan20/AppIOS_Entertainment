@@ -1,6 +1,6 @@
 import React from 'react';
-import PlayerScreenMovie from './video_player/PlayerScreenMovie';
-import PlayerScreenTVShow from './video_player/PlayerScreenTVShow';
+import PlayerScreenMovie from './PlayerScreenMovie';
+import PlayerScreenTVShow from './PlayerScreenTVShow';
 
 export default function PlayerScreen({ route, navigation }: any) {
   const isTV = route.params?.isTV || route.params?.item?.isTV || route.params?.item?.name ? true : false;

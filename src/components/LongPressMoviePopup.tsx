@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { 
   StyleSheet, Text, View, Image, TouchableOpacity, Dimensions, ActivityIndicator,
-  Modal, TouchableWithoutFeedback, Vibration
+  Modal, TouchableWithoutFeedback
 } from 'react-native';
 import YoutubePlayer from 'react-native-youtube-iframe';
 import { LinearGradient } from 'expo-linear-gradient';

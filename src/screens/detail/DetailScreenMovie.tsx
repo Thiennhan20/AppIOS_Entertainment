@@ -8,14 +8,15 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
 
-import { tmdbApi } from '../api/tmdb';
-import { chatAIApi } from '../api/chatAI';
-import { authApi } from '../api/authApi';
-import { phimApi } from '../api/phimapi';
-import { nguoncApi } from '../api/nguonc';
-import { useTheme } from '../context/ThemeContext';
-import WatchlistButton from '../components/WatchlistButton';
-import LongPressMoviePopup from '../components/LongPressMoviePopup';
+import { tmdbApi } from '../../api/tmdb';
+import { chatAIApi } from '../../api/chatAI';
+import { authApi } from '../../api/authApi';
+import { phimApi } from '../../api/phimapi';
+import { nguoncApi } from '../../api/nguonc';
+import { useTheme } from '../../context/ThemeContext';
+import WatchlistButton from '../../components/WatchlistButton';
+import LongPressMoviePopup from '../../components/LongPressMoviePopup';
+import CustomAlert from '../../components/CustomAlert';
 
 const { width, height } = Dimensions.get('window');
 
@@ -42,10 +43,21 @@ export default function DetailScreenMovie({ route, navigation }: any) {
   const [selectedAudio, setSelectedAudio] = useState<'vietsub'|'dubbed'>('vietsub');
   const [showAudioPicker, setShowAudioPicker] = useState(false);
 
-  const [isFetchingLink, setIsFetchingLink] = useState(false);
+  const [alertInfo, setAlertInfo] = useState({
+    visible: false,
+    title: '',
+    message: '',
+    isError: false,
+  });
+
+  const showAlert = (title: string, message: string, isError: boolean = false) => {
+    setAlertInfo({ visible: true, title, message, isError });
+  };
 
   const [s1Available, setS1Available] = useState<('vietsub'|'dubbed')[]>([]);
   const [s3Available, setS3Available] = useState<('vietsub'|'dubbed')[]>([]);
+  const [s1LinksData, setS1LinksData] = useState<any>(null);
+  const [s3LinksData, setS3LinksData] = useState<any>(null);
   const [checkingStreams, setCheckingStreams] = useState(true);
 
   const handleLongPress = (item: any, isTVItem: boolean) => {
@@ -109,11 +121,11 @@ export default function DetailScreenMovie({ route, navigation }: any) {
 
         const s1: ('vietsub'|'dubbed')[] = [];
         if (s1Tracks) {
-          if (s1Tracks.some(a => {
+          if (s1Tracks.some((a: any) => {
             const low = a.name.toLowerCase();
             return low.includes('vietsub') || low.includes('phụ đề') || low.includes('sub');
           })) s1.push('vietsub');
-          if (s1Tracks.some(a => {
+          if (s1Tracks.some((a: any) => {
             const low = a.name.toLowerCase();
             return low.includes('thuyết minh') || low.includes('dub') || low.includes('lồng tiếng');
           })) s1.push('dubbed');
@@ -124,6 +136,9 @@ export default function DetailScreenMovie({ route, navigation }: any) {
           if (s3Links.vietsub) s3.push('vietsub');
           if (s3Links.dubbed) s3.push('dubbed');
         }
+
+        setS1LinksData(s1Tracks);
+        setS3LinksData(s3Links);
 
         setS1Available(s1);
         setS3Available(s3);
@@ -146,16 +161,19 @@ export default function DetailScreenMovie({ route, navigation }: any) {
   const activeAudioList = selectedServer === 'Server 1' ? s1Available : s3Available;
 
   const handlePlay = async () => {
-    if (isFetchingLink) return;
-    setIsFetchingLink(true);
+    if (checkingStreams) return;
     
     try {
       if (selectedServer === 'Server 1') {
-        const audioTracks = await phimApi.getStreamingLink(item.id.toString(), title, parseInt(year), 1, isTV, 1);
+        let audioTracks = s1LinksData;
+        if (!audioTracks) {
+          audioTracks = await phimApi.getStreamingLink(item.id.toString(), title, parseInt(year), 1, isTV, 1);
+        }
+        
         if (audioTracks && audioTracks.length > 0) {
           
           // Match selectedAudio with Server 1 track names (Vietsub, Thuyết Minh, etc.)
-          let streamObj = audioTracks.find(a => {
+          let streamObj = audioTracks.find((a: any) => {
             const lowerName = a.name.toLowerCase();
             if (selectedAudio === 'vietsub') return lowerName.includes('vietsub') || lowerName.includes('phụ đề') || lowerName.includes('sub');
             if (selectedAudio === 'dubbed') return lowerName.includes('thuyết minh') || lowerName.includes('lồng tiếng') || lowerName.includes('dub');
@@ -169,20 +187,23 @@ export default function DetailScreenMovie({ route, navigation }: any) {
             navigation.navigate('PlayerScreen', { 
               item, isTV, 
               streamUrl: streamObj.url, 
-              activePlayer: 'm3u8',
-              title: isTV ? `${title} - S1 E1 (${streamObj.name})` : `${title} (${streamObj.name})`,
+              activePlayer: streamObj.url.includes('.m3u8') ? 'm3u8' : 'embed',
+              title: isTV ? `${title} - S1 E1` : title,
               selectedServer,
               selectedAudio,
               seasons: details?.seasons
             });
           } else {
-            Alert.alert(t('general.notice'), t('player.stream_not_on_server_1', { defaultValue: 'Stream unavailable on Server 1' }));
+            showAlert(t('general.notice'), t('player.stream_not_on_server_1', { defaultValue: 'Movie not available on Server 1.\nPlease try Server 3.' }));
           }
         } else {
-          Alert.alert(t('general.notice'), t('player.stream_not_on_server_1', { defaultValue: 'Stream unavailable on Server 1' }));
+          showAlert(t('general.notice'), t('player.stream_not_on_server_1', { defaultValue: 'Movie not available on Server 1.\nPlease try Server 3.' }));
         }
       } else {
-        const links = await nguoncApi.getStreamingLink(isTV, title, parseInt(year), director, 1, 1);
+        let links = s3LinksData;
+        if (!links) {
+          links = await nguoncApi.getStreamingLink(isTV, title, parseInt(year), director, 1, 1);
+        }
         if (links) {
           const urlStr = links[selectedAudio];
           if (urlStr) {
@@ -197,16 +218,14 @@ export default function DetailScreenMovie({ route, navigation }: any) {
                seasons: details?.seasons
              });
           } else {
-             Alert.alert(t('general.notice'), t('player.stream_not_on_server_3', { defaultValue: 'Stream unavailable on Server 3' }));
+             showAlert(t('general.notice'), t('player.stream_not_on_server_3', { defaultValue: 'Movie not available on Server 3.\nPlease try Server 1.' }));
           }
         } else {
-          Alert.alert(t('general.notice'), t('player.stream_not_on_server_3', { defaultValue: 'Stream unavailable on Server 3' }));
+          showAlert(t('general.notice'), t('player.stream_not_on_server_3', { defaultValue: 'Movie not available on Server 3.\nPlease try Server 1.' }));
         }
       }
     } catch (e) {
-      Alert.alert(t('general.notice'), t('player.error_loading_stream', { defaultValue: 'Failed to load stream link. Please try another Server.' }));
-    } finally {
-      setIsFetchingLink(false);
+      showAlert(t('general.error', { defaultValue: 'Error' }), t('player.error_loading_stream', { defaultValue: 'Failed to load movie link.\nPlease try another Server.' }), true);
     }
   };
 
@@ -269,18 +288,14 @@ export default function DetailScreenMovie({ route, navigation }: any) {
           {/* Player controls and quick actions */}
           <View style={styles.playControlsRow}>
             <TouchableOpacity 
-              style={[styles.playButtonFull, { backgroundColor: themeColor }]}
+              style={[styles.playButtonFull, { backgroundColor: checkingStreams ? '#333' : themeColor }]}
               onPress={handlePlay}
-              disabled={isFetchingLink}
+              disabled={checkingStreams}
             >
-              {isFetchingLink ? (
-                <ActivityIndicator size="small" color="white" />
-              ) : (
-                <>
-                  <Ionicons name="play" size={20} color="white" />
-                  <Text style={[styles.playButtonText, { color: 'white' }]}>{t('general.play_now')}</Text>
-                </>
-              )}
+              <Ionicons name="play" size={20} color={checkingStreams ? "#888" : "white"} />
+              <Text style={[styles.playButtonText, { color: checkingStreams ? '#888' : 'white' }]}>
+                {t('general.play_now')}
+              </Text>
             </TouchableOpacity>
 
             <View style={styles.actionRowMini}>
@@ -288,7 +303,7 @@ export default function DetailScreenMovie({ route, navigation }: any) {
                 style={styles.actionItemMini} 
                 onPress={() => {
                   if (trailerKey) setShowTrailer(true);
-                  else Alert.alert(t('general.notice'), t('home.cannot_load_trailer'));
+                  else showAlert(t('general.notice'), t('home.cannot_load_trailer'), true);
                 }}
               >
                 <Ionicons name="film-outline" size={24} color={trailerKey ? "white" : "gray"} />
@@ -296,8 +311,8 @@ export default function DetailScreenMovie({ route, navigation }: any) {
               </TouchableOpacity>
               <WatchlistButton movie={{ ...item, isTV }} styleType="detail" />
               <TouchableOpacity style={styles.actionItemMini}>
-                <Ionicons name="thumbs-up-outline" size={24} color="white" />
-                <Text style={styles.actionItemTextMini}>{t('general.like')}</Text>
+                <Ionicons name="star-outline" size={24} color="white" />
+                <Text style={styles.actionItemTextMini}>{t('general.rate', { defaultValue: 'Rate' })}</Text>
               </TouchableOpacity>
               <TouchableOpacity style={styles.actionItemMini}>
                 <Ionicons name="share-social-outline" size={24} color="white" />
@@ -487,6 +502,15 @@ export default function DetailScreenMovie({ route, navigation }: any) {
         </TouchableOpacity>
       </Modal>
 
+      {/* Custom Alert */}
+      <CustomAlert
+        visible={alertInfo.visible}
+        title={alertInfo.title}
+        message={alertInfo.message}
+        isError={alertInfo.isError}
+        onClose={() => setAlertInfo(prev => ({ ...prev, visible: false }))}
+      />
+
     </View>
   );
 }
@@ -596,17 +620,20 @@ const styles = StyleSheet.create({
   },
   actionRowMini: {
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'flex-start',
   },
   actionItemMini: {
     alignItems: 'center',
-    marginLeft: 15,
+    justifyContent: 'flex-start',
+    marginHorizontal: 10,
+    minWidth: 50,
   },
   actionItemTextMini: {
-    color: 'gray',
-    fontSize: 10,
-    marginTop: 4,
+    color: '#ccc',
+    fontSize: 11,
+    marginTop: 6,
     fontWeight: '500',
+    textAlign: 'center',
   },
   overview: {
     color: '#fff',
