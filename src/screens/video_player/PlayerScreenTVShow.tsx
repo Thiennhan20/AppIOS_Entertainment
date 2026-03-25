@@ -1,7 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { 
   StyleSheet, Text, View, Dimensions, TouchableOpacity, 
-  ActivityIndicator, ScrollView, Modal, TextInput, KeyboardAvoidingView, Platform, Alert
+  ActivityIndicator, ScrollView, Modal, TextInput, KeyboardAvoidingView, Platform, Alert, Animated
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as ScreenOrientation from 'expo-screen-orientation';
@@ -23,6 +23,41 @@ const { width, height } = Dimensions.get('window');
 
 
 function EmbedPlayerInline({ url, onToggleFullscreen, isFullscreen }: { url: string, onToggleFullscreen: () => void, isFullscreen: boolean }) {
+  const [showTopBar, setShowTopBar] = useState(true);
+  const topBarTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  const [zoomLevel, setZoomLevel] = useState(0); // -1 (small), 0 (medium - default), 1 (large)
+  const scaleAnim = useRef(new Animated.Value(1)).current;
+
+  const resetTopBarTimeout = () => {
+    setShowTopBar(true);
+    if (topBarTimeoutRef.current) clearTimeout(topBarTimeoutRef.current);
+    topBarTimeoutRef.current = setTimeout(() => {
+      setShowTopBar(false);
+    }, 3500);
+  };
+
+  useEffect(() => {
+    let toValue = 1;
+    if (isFullscreen) {
+      if (zoomLevel === 1) toValue = 1.35;
+      else if (zoomLevel === -1) toValue = 0.9;
+    }
+    Animated.spring(scaleAnim, {
+      toValue,
+      useNativeDriver: true,
+      bounciness: 6,
+      speed: 12,
+    }).start();
+
+    if (isFullscreen) {
+      resetTopBarTimeout();
+    } else {
+      setShowTopBar(false);
+      setZoomLevel(0); // Reset zoom on exit
+    }
+    return () => { if (topBarTimeoutRef.current) clearTimeout(topBarTimeoutRef.current); };
+  }, [isFullscreen, zoomLevel]);
   // Inject JS to intercept fullscreen calls from the web player
   const INJECTED_JS = `
     (function() {
@@ -57,7 +92,29 @@ function EmbedPlayerInline({ url, onToggleFullscreen, isFullscreen }: { url: str
                e.stopPropagation();
             }
          }
+      // Track touch activity to keep UI awake & PINCH ZOOM
+      var initialDist = null;
+      var getD = function(t){ return Math.sqrt(Math.pow(t[0].pageX-t[1].pageX,2)+Math.pow(t[0].pageY-t[1].pageY,2)); };
+      
+      document.addEventListener('touchstart', function(e) {
+         window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'userActivity' }));
+         if(e.touches.length === 2) initialDist = getD(e.touches);
+         else initialDist = null;
       }, true);
+      
+      document.addEventListener('touchmove', function(e) {
+         if(e.touches.length === 2 && initialDist) {
+            var curr = getD(e.touches);
+            var ratio = curr / initialDist;
+            if(ratio > 1.2) { 
+               window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'pinchOut' })); 
+               initialDist = curr; 
+            } else if(ratio < 0.8) { 
+               window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'pinchIn' })); 
+               initialDist = curr; 
+            }
+         }
+      }, { passive: true, capture: true });
     })();
     true;
   `;
@@ -67,30 +124,46 @@ function EmbedPlayerInline({ url, onToggleFullscreen, isFullscreen }: { url: str
       const data = JSON.parse(event.nativeEvent.data);
       if (data.type === 'toggleFullscreen') {
         onToggleFullscreen();
+      } else if (data.type === 'userActivity' && isFullscreen) {
+        resetTopBarTimeout();
+      } else if (data.type === 'pinchOut' && isFullscreen) {
+        setZoomLevel(prev => {
+          if (prev === -1) return 0;
+          if (prev === 0) return 1;
+          return prev;
+        });
+      } else if (data.type === 'pinchIn' && isFullscreen) {
+        setZoomLevel(prev => {
+          if (prev === 1) return 0;
+          if (prev === 0) return -1;
+          return prev;
+        });
       }
     } catch(e) {}
   };
 
   return (
     <View style={styles.inlinePlayerContainer}>
-      {isFullscreen && (
+      {isFullscreen && showTopBar && (
         <View style={styles.webViewTopBar}>
-          <TouchableOpacity onPress={onToggleFullscreen} style={{ padding: 10, marginLeft: 15 }}>
+          <TouchableOpacity onPress={onToggleFullscreen} style={{ padding: 10, marginRight: 5 }}>
             <Ionicons name="close" size={30} color="white" />
           </TouchableOpacity>
         </View>
       )}
-      <WebView
-        source={{ uri: url }}
-        style={styles.inlinePlayer}
-        javaScriptEnabled
-        allowsFullscreenVideo={false}
-        domStorageEnabled
-        allowsInlineMediaPlayback={true}
-        mediaPlaybackRequiresUserAction={false}
-        injectedJavaScript={INJECTED_JS}
-        onMessage={onMessage}
-      />
+      <Animated.View style={{ flex: 1, width: '100%', transform: [{ scale: scaleAnim }], overflow: 'hidden' }}>
+        <WebView
+          source={{ uri: url }}
+          style={styles.inlinePlayer}
+          javaScriptEnabled
+          allowsFullscreenVideo={false}
+          domStorageEnabled
+          allowsInlineMediaPlayback={true}
+          mediaPlaybackRequiresUserAction={false}
+          injectedJavaScript={INJECTED_JS}
+          onMessage={onMessage}
+        />
+      </Animated.View>
     </View>
   );
 }
@@ -441,6 +514,8 @@ const styles = StyleSheet.create({
     top: 5,
     left: 10,
     zIndex: 999,
+    flexDirection: 'row',
+    alignItems: 'center',
   },
   loadingContainer: {
     flex: 1,

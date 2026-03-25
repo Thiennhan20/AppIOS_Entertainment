@@ -26,6 +26,7 @@ export default function CustomVideoPlayer({ url, isFullscreen, onToggleFullscree
   const [zoomLevel, setZoomLevel] = useState(0); // -1 (small), 0 (medium - default), 1 (large)
   
   const scaleAnim = useRef(new Animated.Value(1)).current;
+  const videoViewRef = useRef<VideoView>(null);
 
   const controlsTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const initialPinchDistRef = useRef<number | null>(null);
@@ -181,6 +182,10 @@ export default function CustomVideoPlayer({ url, isFullscreen, onToggleFullscree
     return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
   };
 
+  const togglePiP = () => {
+    videoViewRef.current?.startPictureInPicture().catch(() => {});
+  };
+
   return (
     <View style={styles.container}>
       <View 
@@ -191,6 +196,7 @@ export default function CustomVideoPlayer({ url, isFullscreen, onToggleFullscree
       >
           <Animated.View style={{ flex: 1, width: '100%', transform: [{ scale: scaleAnim }] }}>
             <VideoView
+              ref={videoViewRef}
               style={styles.video}
               player={player}
               nativeControls={false}
@@ -224,7 +230,7 @@ export default function CustomVideoPlayer({ url, isFullscreen, onToggleFullscree
                   <TouchableOpacity style={styles.topBtn} onPress={onToggleFullscreen}>
                       <Ionicons name="close" size={30} color="white" />
                   </TouchableOpacity>
-                  <TouchableOpacity style={styles.topBtn} onPress={() => {}}>
+                  <TouchableOpacity style={styles.topBtn} onPress={togglePiP}>
                       <Ionicons name="albums-outline" size={24} color="white" />
                   </TouchableOpacity>
                 </>
