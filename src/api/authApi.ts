@@ -1,7 +1,6 @@
 import axios from 'axios';
 import { CONFIG } from '../constants/config';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { useTranslation } from 'react-i18next';
 
 const apiClient = axios.create({
   baseURL: `${CONFIG.API_BASE_URL}/api`,
@@ -62,6 +61,28 @@ export const authApi = {
 
   getRecentlyWatched: async () => {
     const response = await apiClient.get('/recently-watched');
+    return response.data;
+  },
+
+  getRecentlyWatchedItem: async (contentId: string, server: string, audio: string, isTVShow?: boolean, season?: number, episode?: number) => {
+    const params = new URLSearchParams();
+    params.append('contentId', contentId.toString());
+    params.append('server', server.toLowerCase().replace(/\s/g, ''));
+    params.append('audio', audio.toLowerCase());
+    if (isTVShow !== undefined) params.append('isTVShow', isTVShow.toString());
+    if (season !== undefined) params.append('season', season.toString());
+    if (episode !== undefined) params.append('episode', episode.toString());
+
+    const response = await apiClient.get(`/recently-watched?${params.toString()}`);
+    return response.data;
+  },
+
+  upsertRecentlyWatched: async (data: any) => {
+    const payload = { ...data };
+    if (payload.server) payload.server = payload.server.toLowerCase().replace(/\s/g, '');
+    if (payload.audio) payload.audio = payload.audio.toLowerCase();
+    
+    const response = await apiClient.post('/recently-watched', payload);
     return response.data;
   },
 

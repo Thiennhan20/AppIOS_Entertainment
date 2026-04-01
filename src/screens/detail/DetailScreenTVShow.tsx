@@ -37,10 +37,15 @@ export default function DetailScreenTVShow({ route, navigation }: any) {
 
   const [selectedMovie, setSelectedMovie] = useState<any>(null);
 
-  const [selectedServer, setSelectedServer] = useState<'Server 1' | 'Server 3'>('Server 1');
+  const initServer = item?.server ? (item.server.toLowerCase().includes('server3') || item.server.toLowerCase().includes('server 3') ? 'Server 3' : 'Server 1') : 'Server 1';
+  const initAudio = item?.audio ? (item.audio.toLowerCase().includes('dub') || item.audio.toLowerCase().includes('thuyết') || item.audio.toLowerCase().includes('lồng') ? 'dubbed' : 'vietsub') : 'vietsub';
+  const initSeason = item?.season || 1;
+  const initEpisode = item?.episode || 1;
+
+  const [selectedServer, setSelectedServer] = useState<'Server 1' | 'Server 3'>(initServer);
   const [showServerPicker, setShowServerPicker] = useState(false);
 
-  const [selectedAudio, setSelectedAudio] = useState<'vietsub'|'dubbed'>('vietsub');
+  const [selectedAudio, setSelectedAudio] = useState<'vietsub'|'dubbed'>(initAudio);
   const [showAudioPicker, setShowAudioPicker] = useState(false);
 
   const [alertInfo, setAlertInfo] = useState({
@@ -113,8 +118,8 @@ export default function DetailScreenTVShow({ route, navigation }: any) {
       if (isMounted) setCheckingStreams(true);
       try {
         const [s1Tracks, s3Links] = await Promise.all([
-          phimApi.getStreamingLink(item.id.toString(), title, parseInt(year), 1, isTV, 1),
-          nguoncApi.getStreamingLink(isTV, title, parseInt(year), director, 1, 1)
+          phimApi.getStreamingLink(item.id.toString(), title, parseInt(year), initEpisode, isTV, initSeason),
+          nguoncApi.getStreamingLink(isTV, title, parseInt(year), director, initSeason, initEpisode)
         ]);
 
         if (!isMounted) return;
@@ -167,7 +172,7 @@ export default function DetailScreenTVShow({ route, navigation }: any) {
       if (selectedServer === 'Server 1') {
         let audioTracks = s1LinksData;
         if (!audioTracks) {
-          audioTracks = await phimApi.getStreamingLink(item.id.toString(), title, parseInt(year), 1, isTV, 1);
+          audioTracks = await phimApi.getStreamingLink(item.id.toString(), title, parseInt(year), initEpisode, isTV, initSeason);
         }
         
         if (audioTracks && audioTracks.length > 0) {
@@ -188,10 +193,12 @@ export default function DetailScreenTVShow({ route, navigation }: any) {
               item, isTV, 
               streamUrl: streamObj.url, 
               activePlayer: streamObj.url.includes('.m3u8') ? 'm3u8' : 'embed',
-              title: isTV ? `${title} - S1 E1` : title,
+              title: isTV ? `${title} - S${initSeason} E${initEpisode}` : title,
               selectedServer,
               selectedAudio,
-              seasons: details?.seasons
+              seasons: details?.seasons,
+              initialSeason: initSeason,
+              initialEpisode: initEpisode
             });
           } else {
             showAlert(t('general.notice'), t('player.stream_not_on_server_1', { defaultValue: 'Movie not available on Server 1.\nPlease try Server 3.' }));
@@ -202,7 +209,7 @@ export default function DetailScreenTVShow({ route, navigation }: any) {
       } else {
         let links = s3LinksData;
         if (!links) {
-          links = await nguoncApi.getStreamingLink(isTV, title, parseInt(year), director, 1, 1);
+          links = await nguoncApi.getStreamingLink(isTV, title, parseInt(year), director, initSeason, initEpisode);
         }
         if (links) {
           const urlStr = links[selectedAudio];
@@ -212,10 +219,12 @@ export default function DetailScreenTVShow({ route, navigation }: any) {
                item, isTV,
                streamUrl: finalUrl,
                activePlayer: finalUrl.includes('.m3u8') ? 'm3u8' : 'embed',
-               title: isTV ? `${title} - S1 E1` : title,
+               title: isTV ? `${title} - S${initSeason} E${initEpisode}` : title,
                selectedServer,
                selectedAudio,
-               seasons: details?.seasons
+               seasons: details?.seasons,
+               initialSeason: initSeason,
+               initialEpisode: initEpisode
              });
           } else {
              showAlert(t('general.notice'), t('player.stream_not_on_server_3', { defaultValue: 'Movie not available on Server 3.\nPlease try Server 1.' }));

@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { 
   StyleSheet, Text, View, Dimensions, TouchableOpacity, 
-  ActivityIndicator, ScrollView, Modal, TextInput, KeyboardAvoidingView, Platform, Alert, Animated
+  ActivityIndicator, ScrollView, Modal, TextInput, KeyboardAvoidingView, Platform, Alert
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as ScreenOrientation from 'expo-screen-orientation';
@@ -15,6 +15,7 @@ import { WebView } from 'react-native-webview';
 import { useTheme } from '../../context/ThemeContext';
 import { phimApi } from '../../api/phimapi';
 import { nguoncApi } from '../../api/nguonc';
+import { authApi } from '../../api/authApi';
 import CustomAlert from '../../components/CustomAlert';
 import CustomVideoPlayer from '../../components/CustomVideoPlayer';
 
@@ -24,46 +25,47 @@ const { width, height } = Dimensions.get('window');
 
 function EmbedPlayerInline({ url, onToggleFullscreen, isFullscreen }: { url: string, onToggleFullscreen: () => void, isFullscreen: boolean }) {
   const [showTopBar, setShowTopBar] = useState(true);
-  const topBarTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const webViewRef = useRef<WebView>(null);
 
-  const [zoomLevel, setZoomLevel] = useState(0); // -1 (small), 0 (medium - default), 1 (large)
-  const scaleAnim = useRef(new Animated.Value(1)).current;
+  const autoHideRef = useRef<NodeJS.Timeout | null>(null);
+  const lastToggleRef = useRef(0);
 
-  const resetTopBarTimeout = () => {
-    setShowTopBar(true);
-    if (topBarTimeoutRef.current) clearTimeout(topBarTimeoutRef.current);
-    topBarTimeoutRef.current = setTimeout(() => {
+  const startAutoHide = () => {
+    if (autoHideRef.current) clearTimeout(autoHideRef.current);
+    autoHideRef.current = setTimeout(() => {
       setShowTopBar(false);
-    }, 3500);
+    }, 3000);
+  };
+
+  const toggleTopBar = () => {
+    const now = Date.now();
+    if (now - lastToggleRef.current < 400) return;
+    lastToggleRef.current = now;
+
+    setShowTopBar(prev => {
+      if (prev) {
+        if (autoHideRef.current) clearTimeout(autoHideRef.current);
+        return false;
+      } else {
+        startAutoHide();
+        return true;
+      }
+    });
   };
 
   useEffect(() => {
-    let toValue = 1;
     if (isFullscreen) {
-      if (zoomLevel === 1) toValue = 1.35;
-      else if (zoomLevel === -1) toValue = 0.9;
-    }
-    Animated.spring(scaleAnim, {
-      toValue,
-      useNativeDriver: true,
-      bounciness: 6,
-      speed: 12,
-    }).start();
-
-    if (isFullscreen) {
-      resetTopBarTimeout();
+      setShowTopBar(true);
+      startAutoHide();
     } else {
       setShowTopBar(false);
-      setZoomLevel(0); // Reset zoom on exit
+      if (autoHideRef.current) clearTimeout(autoHideRef.current);
     }
-    return () => { if (topBarTimeoutRef.current) clearTimeout(topBarTimeoutRef.current); };
-  }, [isFullscreen, zoomLevel]);
+    return () => { if (autoHideRef.current) clearTimeout(autoHideRef.current); };
+  }, [isFullscreen]);
 
-  // Inject JS to intercept fullscreen calls from the web player
   const INJECTED_JS = `
     (function() {
-      // Overwrite video fullscreen methods
       var overrideFullscreen = function(v) {
         v.webkitEnterFullscreen = function() {
            window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'toggleFullscreen' }));
@@ -74,7 +76,6 @@ function EmbedPlayerInline({ url, onToggleFullscreen, isFullscreen }: { url: str
         };
       };
 
-      // Poll for video element
       var checkVideo = setInterval(function() {
         var v = document.querySelector('video');
         if (v && !v._fullscreenOverridden) {
@@ -84,7 +85,6 @@ function EmbedPlayerInline({ url, onToggleFullscreen, isFullscreen }: { url: str
         }
       }, 500);
       
-      // Fallback: Intercept clicks on buttons that look like fullscreen
       document.addEventListener('click', function(e) {
          window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'userActivity' }));
          if (e.target && e.target.className && typeof e.target.className === 'string') {
@@ -97,29 +97,9 @@ function EmbedPlayerInline({ url, onToggleFullscreen, isFullscreen }: { url: str
          }
       }, true);
       
-      // Track touch activity to keep UI awake & PINCH ZOOM
-      var initialDist = null;
-      var getD = function(t){ return Math.sqrt(Math.pow(t[0].pageX-t[1].pageX,2)+Math.pow(t[0].pageY-t[1].pageY,2)); };
-      
       document.addEventListener('touchstart', function(e) {
          window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'userActivity' }));
-         if(e.touches.length === 2) initialDist = getD(e.touches);
-         else initialDist = null;
       }, true);
-      
-      document.addEventListener('touchmove', function(e) {
-         if(e.touches.length === 2 && initialDist) {
-            var curr = getD(e.touches);
-            var ratio = curr / initialDist;
-            if(ratio > 1.2) { 
-               window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'pinchOut' })); 
-               initialDist = curr; 
-            } else if(ratio < 0.8) { 
-               window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'pinchIn' })); 
-               initialDist = curr; 
-            }
-         }
-      }, { passive: true, capture: true });
     })();
     true;
   `;
@@ -130,19 +110,7 @@ function EmbedPlayerInline({ url, onToggleFullscreen, isFullscreen }: { url: str
       if (data.type === 'toggleFullscreen') {
         onToggleFullscreen();
       } else if (data.type === 'userActivity' && isFullscreen) {
-        resetTopBarTimeout();
-      } else if (data.type === 'pinchOut' && isFullscreen) {
-        setZoomLevel(prev => {
-          if (prev === -1) return 0;
-          if (prev === 0) return 1;
-          return prev;
-        });
-      } else if (data.type === 'pinchIn' && isFullscreen) {
-        setZoomLevel(prev => {
-          if (prev === 1) return 0;
-          if (prev === 0) return -1;
-          return prev;
-        });
+        toggleTopBar();
       }
     } catch(e) {}
   };
@@ -151,25 +119,23 @@ function EmbedPlayerInline({ url, onToggleFullscreen, isFullscreen }: { url: str
     <View style={styles.inlinePlayerContainer}>
       {isFullscreen && showTopBar && (
         <View style={styles.webViewTopBar}>
-          <TouchableOpacity onPress={onToggleFullscreen} style={{ padding: 10, marginRight: 5 }}>
-            <Ionicons name="close" size={30} color="white" />
+          <TouchableOpacity onPress={onToggleFullscreen} style={{ padding: 10 }}>
+            <Ionicons name="close-outline" size={30} color="white" />
           </TouchableOpacity>
         </View>
       )}
-      <Animated.View style={{ flex: 1, width: '100%', transform: [{ scale: scaleAnim }], overflow: 'hidden' }}>
-        <WebView
-          ref={webViewRef}
-          source={{ uri: url }}
-          style={styles.inlinePlayer}
-          javaScriptEnabled
-          allowsFullscreenVideo={false}
-          domStorageEnabled
-          allowsInlineMediaPlayback={true}
-          mediaPlaybackRequiresUserAction={false}
-          injectedJavaScript={INJECTED_JS}
-          onMessage={onMessage}
-        />
-      </Animated.View>
+      <WebView
+        ref={webViewRef}
+        source={{ uri: url }}
+        style={styles.inlinePlayer}
+        javaScriptEnabled
+        allowsFullscreenVideo={false}
+        domStorageEnabled
+        allowsInlineMediaPlayback={true}
+        mediaPlaybackRequiresUserAction={false}
+        injectedJavaScript={INJECTED_JS}
+        onMessage={onMessage}
+      />
     </View>
   );
 }
@@ -189,6 +155,8 @@ export default function PlayerScreenMovie({ route, navigation }: any) {
   const [activePlayerState, setActivePlayerState] = useState(activePlayer);
   const [titleState, setTitleState] = useState(routeTitle || item?.title || item?.name || 'Unknown Title');
   const [loadingStream, setLoadingStream] = useState(false);
+
+
 
   const [selectedSeason, setSelectedSeason] = useState(1);
   const [selectedEpisode, setSelectedEpisode] = useState(1);
@@ -343,6 +311,12 @@ export default function PlayerScreenMovie({ route, navigation }: any) {
                   isFullscreen={isFullscreen} 
                   onToggleFullscreen={toggleFullscreen}
                   themeColor={themeColor}
+                  movieId={item.id.toString()}
+                  server={selectedServer}
+                  audio={selectedAudio}
+                  isTVShow={isTV}
+                  title={titleState}
+                  poster={item.poster_path ? `https://image.tmdb.org/t/p/w400${item.poster_path}` : ''}
                 />
               ) : (
                 <EmbedPlayerInline url={streamUrlState} onToggleFullscreen={toggleFullscreen} isFullscreen={isFullscreen} />
@@ -453,6 +427,8 @@ export default function PlayerScreenMovie({ route, navigation }: any) {
           </View>
         </TouchableOpacity>
       </Modal>
+
+
 
       {/* Custom Alert */}
       <CustomAlert
@@ -681,5 +657,6 @@ const styles = StyleSheet.create({
     backgroundColor: '#E50914',
     justifyContent: 'center',
     alignItems: 'center',
-  }
+  },
+
 });

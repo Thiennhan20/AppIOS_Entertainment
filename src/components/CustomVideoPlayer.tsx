@@ -1,41 +1,134 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, TouchableWithoutFeedback, Animated } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Animated, AppState, AppStateStatus } from 'react-native';
 import { useVideoPlayer, VideoView } from 'expo-video';
 import { Ionicons } from '@expo/vector-icons';
 import Slider from '@react-native-community/slider';
 import { useFocusEffect } from '@react-navigation/native';
 import { LinearGradient } from 'expo-linear-gradient';
+import { authApi } from '../api/authApi';
 
 interface CustomVideoPlayerProps {
   url: string;
   isFullscreen: boolean;
   onToggleFullscreen: () => void;
   themeColor: string;
+  // Save progress props
+  movieId?: string;
+  server?: string;
+  audio?: string;
+  isTVShow?: boolean;
+  season?: number;
+  episode?: number;
+  title?: string;
+  poster?: string;
 }
 
-export default function CustomVideoPlayer({ url, isFullscreen, onToggleFullscreen, themeColor }: CustomVideoPlayerProps) {
+export default function CustomVideoPlayer({
+  url, isFullscreen, onToggleFullscreen, themeColor,
+  movieId, server, audio, isTVShow, season, episode, title, poster
+}: CustomVideoPlayerProps) {
   const [showControls, setShowControls] = useState(true);
-  const [isPlaying, setIsPlaying] = useState(true);
-  const [currentTime, setCurrentTime] = useState(0);
-  const [duration, setDuration] = useState(0);
-  const [playbackRate, setPlaybackRate] = useState(1);
-  const [isMuted, setIsMuted] = useState(false);
-  const [volume, setVolume] = useState(1);
+  const [playerState, setPlayerState] = useState({
+    currentTime: 0,
+    duration: 0,
+    isPlaying: true,
+    playbackRate: 1,
+    isMuted: false,
+    volume: 1,
+  });
 
   const [showSpeedMenu, setShowSpeedMenu] = useState(false);
-  const [zoomLevel, setZoomLevel] = useState(0); // -1 (small), 0 (medium - default), 1 (large)
-  
+  const [showZoomMenu, setShowZoomMenu] = useState(false);
+  const ZOOM_LEVELS = [0.9, 0.95, 1.0, 1.1, 1.15];
+  const [zoomIndex, setZoomIndex] = useState(2);
+
+  // Resume popup state
+  const [resumePopup, setResumePopup] = useState<{ show: boolean; savedTime: number }>({ show: false, savedTime: 0 });
+  const [checkingResume, setCheckingResume] = useState(true);
+
   const scaleAnim = useRef(new Animated.Value(1)).current;
   const videoViewRef = useRef<VideoView>(null);
-
   const controlsTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const initialPinchDistRef = useRef<number | null>(null);
   const hasPinchedRef = useRef<boolean>(false);
+  const hasSeekedRef = useRef<boolean>(false);
+
+  // Save progress refs
+  const lastSavedTimeRef = useRef(0);
+  const hasEverPlayedRef = useRef(false);
+  const seekDebounceRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Timeline jump guard refs
+  const allowedSeekRef = useRef(false);
+  const lastKnownTimeRef = useRef(0);
 
   const player = useVideoPlayer(url, p => {
     p.loop = false;
-    p.play();
+    // Don't auto-play until resume check is done
   });
+
+  // ─── Resume: fetch saved time → show popup ──────────────
+  useEffect(() => {
+    if (!movieId || !server || !audio) {
+      setCheckingResume(false);
+      return;
+    }
+
+    let cancelled = false;
+
+    const checkResume = async () => {
+      try {
+        const res = await authApi.getRecentlyWatchedItem(
+          movieId, server, audio, isTVShow, season, episode
+        );
+        if (cancelled) return;
+        if (res && res.item && res.item.currentTime > 10) {
+          setResumePopup({ show: true, savedTime: res.item.currentTime });
+        } else {
+          setCheckingResume(false);
+          player.play();
+        }
+      } catch {
+        if (!cancelled) {
+          setCheckingResume(false);
+          player.play();
+        }
+      }
+    };
+
+    checkResume();
+    return () => { cancelled = true; };
+  }, [movieId, server, audio, isTVShow, season, episode]);
+
+  // ─── Resume handlers ────────────────────────────────────
+  const handleResumeContinue = () => {
+    const seekTo = resumePopup.savedTime;
+    setResumePopup({ show: false, savedTime: 0 });
+    setCheckingResume(false);
+    hasSeekedRef.current = false; // Allow seek to savedTime
+    allowedSeekRef.current = true; // Mark as user-initiated (resume)
+    if (player && player.status === 'readyToPlay') {
+      player.currentTime = seekTo;
+      lastKnownTimeRef.current = seekTo;
+      hasSeekedRef.current = true;
+    }
+    // If not ready yet, the seek useEffect below will handle it
+    player.play();
+  };
+
+  const handleResumeStartOver = () => {
+    setResumePopup({ show: false, savedTime: 0 });
+    setCheckingResume(false);
+    player.play();
+  };
+
+  // ─── Seek to resume point when player is ready ──────────
+  useEffect(() => {
+    if (player && player.status === 'readyToPlay' && resumePopup.savedTime > 0 && !hasSeekedRef.current && !resumePopup.show && !checkingResume) {
+      player.currentTime = resumePopup.savedTime;
+      hasSeekedRef.current = true;
+    }
+  }, [player, player.status, resumePopup.savedTime, resumePopup.show, checkingResume]);
 
   useFocusEffect(
     React.useCallback(() => {
@@ -55,8 +148,7 @@ export default function CustomVideoPlayer({ url, isFullscreen, onToggleFullscree
   useEffect(() => {
     let toValue = 1;
     if (isFullscreen) {
-      if (zoomLevel === 1) toValue = 1.35;
-      else if (zoomLevel === -1) toValue = 0.9;
+      toValue = ZOOM_LEVELS[zoomIndex];
     }
     Animated.spring(scaleAnim, {
       toValue,
@@ -64,40 +156,155 @@ export default function CustomVideoPlayer({ url, isFullscreen, onToggleFullscree
       bounciness: 6,
       speed: 12,
     }).start();
-  }, [zoomLevel, isFullscreen]);
+  }, [zoomIndex, isFullscreen]);
+
+  // ─── Polling state (500ms) + Timeline jump guard + Pause detection ──────────
+  const wasPreviouslyPlayingRef = useRef(false);
 
   useEffect(() => {
     const interval = setInterval(() => {
       if (player) {
-        setCurrentTime(player.currentTime || 0);
-        setDuration(player.duration || 0);
-        setIsPlaying(player.playing);
-        setPlaybackRate(player.playbackRate || 1);
-        setIsMuted(player.muted);
-        setVolume(player.volume ?? 1);
+        const newTime = player.currentTime || 0;
+        const delta = Math.abs(newTime - lastKnownTimeRef.current);
+
+        // Timeline jump guard: block unexpected jumps > 3s
+        if (lastKnownTimeRef.current > 0 && delta > 3 && !allowedSeekRef.current) {
+          try { player.currentTime = lastKnownTimeRef.current; } catch {}
+          return;
+        }
+
+        allowedSeekRef.current = false;
+        lastKnownTimeRef.current = newTime;
+
+        // Batch all player state into a single setState
+        setPlayerState({
+          currentTime: newTime,
+          duration: player.duration || 0,
+          isPlaying: player.playing,
+          playbackRate: player.playbackRate || 1,
+          isMuted: player.muted,
+          volume: player.volume ?? 1,
+        });
+
+        // Pause detection (integrated here to avoid a second interval)
+        if (player.playing) {
+          wasPreviouslyPlayingRef.current = true;
+          hasEverPlayedRef.current = true;
+        } else if (wasPreviouslyPlayingRef.current && !player.playing) {
+          wasPreviouslyPlayingRef.current = false;
+          if (saveProgressRef.current) saveProgressRef.current();
+        }
       }
     }, 500);
     return () => clearInterval(interval);
   }, [player]);
 
+  // ─── Save progress (interval 10s + pause + seek debounce + background) ──
+  useEffect(() => {
+    if (!movieId || !server || !audio) return;
+
+    hasEverPlayedRef.current = false;
+
+    // skipDedup: bypass the 5s dedup check (used for seek saves)
+    const saveProgress = async (skipDedup = false) => {
+      if (!hasEverPlayedRef.current) return;
+      const ct = player.currentTime || 0;
+      const dur = player.duration || 0;
+      if (ct > 0 && dur > 0) {
+        const clampedCt = Math.min(ct, dur);
+        if (!skipDedup && Math.abs(clampedCt - lastSavedTimeRef.current) < 5) return;
+        lastSavedTimeRef.current = clampedCt;
+        try {
+          await authApi.upsertRecentlyWatched({
+            contentId: movieId,
+            isTVShow: !!isTVShow,
+            season: isTVShow ? season : null,
+            episode: isTVShow ? episode : null,
+            server, audio,
+            currentTime: clampedCt,
+            duration: dur,
+            title: title || '',
+            poster: poster || ''
+          });
+        } catch {}
+      }
+    };
+
+    // Make saveProgress accessible to seek handlers via ref
+    saveProgressRef.current = saveProgress;
+
+    // ── 1) Interval 10s — only save when playing ──
+    const intervalId = setInterval(() => {
+      if (player.playing) {
+        hasEverPlayedRef.current = true;
+        saveProgress();
+      }
+    }, 10_000);
+
+    // ── 3) Save when app goes to background ──
+    const handleAppState = (nextState: AppStateStatus) => {
+      if (nextState === 'background' || nextState === 'inactive') {
+        try { player.pause(); } catch {}
+        saveProgress(true);
+      }
+    };
+    const appStateSub = AppState.addEventListener('change', handleAppState);
+
+    return () => {
+      clearInterval(intervalId);
+      if (seekDebounceRef.current) clearTimeout(seekDebounceRef.current);
+      appStateSub.remove();
+      // Save one last time on unmount (navigating away)
+      saveProgress(true);
+    };
+  }, [player, movieId, server, audio, isTVShow, season, episode, title, poster]);
+
+  // Ref to expose saveProgress to seek handlers (avoids stale closure)
+  const saveProgressRef = useRef<(skipDedup?: boolean) => Promise<void>>(async () => {});
+
+  // ── 4) Seek debounce save — triggers after any seek settles for 0.5s ──
+  const triggerSeekSave = () => {
+    if (!hasEverPlayedRef.current) return;
+    if (seekDebounceRef.current) clearTimeout(seekDebounceRef.current);
+    seekDebounceRef.current = setTimeout(() => {
+      saveProgressRef.current(true); // skipDedup since seek position matters
+      seekDebounceRef.current = null;
+    }, 500);
+  };
+
   const togglePlay = () => {
-    if (isPlaying) player.pause();
+    if (playerState.isPlaying) player.pause();
     else player.play();
     resetControlsTimeout();
   };
 
   const skipBackward = () => {
-    if (player) player.currentTime = Math.max((player.currentTime || 0) - 10, 0);
+    allowedSeekRef.current = true;
+    if (player) {
+      player.currentTime = Math.max((player.currentTime || 0) - 10, 0);
+      lastKnownTimeRef.current = player.currentTime;
+    }
+    triggerSeekSave();
     resetControlsTimeout();
   };
   
   const skipForward = () => {
-    if (player) player.currentTime = Math.min((player.currentTime || 0) + 10, player.duration || 0);
+    allowedSeekRef.current = true;
+    if (player) {
+      player.currentTime = Math.min((player.currentTime || 0) + 10, player.duration || 0);
+      lastKnownTimeRef.current = player.currentTime;
+    }
+    triggerSeekSave();
     resetControlsTimeout();
   };
 
   const handleSeek = (value: number) => {
-    if (player) player.currentTime = value;
+    allowedSeekRef.current = true;
+    if (player) {
+      player.currentTime = value;
+      lastKnownTimeRef.current = value;
+    }
+    triggerSeekSave();
     resetControlsTimeout();
   };
 
@@ -117,6 +324,7 @@ export default function CustomVideoPlayer({ url, isFullscreen, onToggleFullscree
       if (next) resetControlsTimeout();
       else {
          setShowSpeedMenu(false);
+         setShowZoomMenu(false);
       }
       return next;
     });
@@ -143,13 +351,11 @@ export default function CustomVideoPlayer({ url, isFullscreen, onToggleFullscree
       const ratio = currentDist / initialPinchDistRef.current;
       
       if (ratio > 1.2) {
-         if (zoomLevel === -1) setZoomLevel(0);
-         else if (zoomLevel === 0) setZoomLevel(1);
-         initialPinchDistRef.current = currentDist; // reset baseline
+         setZoomIndex(prev => Math.min(ZOOM_LEVELS.length - 1, prev + 1));
+         initialPinchDistRef.current = currentDist;
       } else if (ratio < 0.8) {
-         if (zoomLevel === 1) setZoomLevel(0);
-         else if (zoomLevel === 0) setZoomLevel(-1);
-         initialPinchDistRef.current = currentDist; // reset baseline
+         setZoomIndex(prev => Math.max(0, prev - 1));
+         initialPinchDistRef.current = currentDist;
       }
     }
   };
@@ -182,9 +388,6 @@ export default function CustomVideoPlayer({ url, isFullscreen, onToggleFullscree
     return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
   };
 
-  const togglePiP = () => {
-    videoViewRef.current?.startPictureInPicture().catch(() => {});
-  };
 
   return (
     <View style={styles.container}>
@@ -208,7 +411,44 @@ export default function CustomVideoPlayer({ url, isFullscreen, onToggleFullscree
           </Animated.View>
       </View>
 
-      {showControls && (
+      {/* Resume Popup — inside player */}
+      {(checkingResume || resumePopup.show) && (
+        <View style={styles.resumeOverlay}>
+          {checkingResume && !resumePopup.show ? (
+            <View style={styles.resumeBox}>
+              <Text style={{ color: '#aaa', fontSize: 14 }}>Checking...</Text>
+            </View>
+          ) : (
+            <View style={styles.resumeBox}>
+              <Text style={styles.resumeTitle}>THÔNG BÁO!</Text>
+              <View style={styles.resumeTimeBox}>
+                <Text style={styles.resumeTimeText}>
+                  Bạn đã dừng lại ở{' '}
+                  <Text style={{ color: '#f59e0b', fontWeight: 'bold' }}>
+                    {Math.floor(resumePopup.savedTime / 60)} phút {Math.floor(resumePopup.savedTime % 60)} giây
+                  </Text>
+                </Text>
+              </View>
+              <View style={styles.resumeBtnRow}>
+                <TouchableOpacity
+                  style={[styles.resumeBtn, { backgroundColor: '#10b981', marginRight: 10 }]}
+                  onPress={handleResumeContinue}
+                >
+                  <Text style={styles.resumeBtnText}>Tiếp tục xem</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.resumeBtn, { backgroundColor: '#f59e0b' }]}
+                  onPress={handleResumeStartOver}
+                >
+                  <Text style={styles.resumeBtnText}>Xem lại từ đầu</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          )}
+        </View>
+      )}
+
+      {showControls && !checkingResume && !resumePopup.show && (
         <View style={styles.overlay} pointerEvents="box-none">
           <LinearGradient
             colors={['rgba(0,0,0,0.85)', 'transparent', 'rgba(0,0,0,0.85)']}
@@ -228,11 +468,35 @@ export default function CustomVideoPlayer({ url, isFullscreen, onToggleFullscree
               {isFullscreen && (
                 <>
                   <TouchableOpacity style={styles.topBtn} onPress={onToggleFullscreen}>
-                      <Ionicons name="close" size={30} color="white" />
+                    <Ionicons name="close-outline" size={30} color="white" />
                   </TouchableOpacity>
-                  <TouchableOpacity style={styles.topBtn} onPress={togglePiP}>
-                      <Ionicons name="albums-outline" size={24} color="white" />
-                  </TouchableOpacity>
+                  
+                  <View style={{ position: 'relative' }}>
+                    <TouchableOpacity style={styles.topBtn} onPress={() => { setShowZoomMenu(!showZoomMenu); resetControlsTimeout(); }}>
+                      <View style={{ backgroundColor: 'rgba(255,255,255,0.2)', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 12 }}>
+                        <Text style={{color: 'white', fontSize: 13, fontWeight: 'bold'}}>{Math.round(ZOOM_LEVELS[zoomIndex] * 100)}%</Text>
+                      </View>
+                    </TouchableOpacity>
+
+                    {showZoomMenu && (
+                      <View style={[styles.popupMenu, { left: 15, right: 'auto', top: 50, width: 80, paddingVertical: 8 }]}>
+                        {[...ZOOM_LEVELS].reverse().map((zl) => {
+                          const actualIndex = ZOOM_LEVELS.indexOf(zl);
+                          return (
+                            <TouchableOpacity key={actualIndex} style={styles.popupMenuItem} onPress={() => {
+                              setZoomIndex(actualIndex);
+                              setShowZoomMenu(false);
+                              resetControlsTimeout();
+                            }}>
+                              <Text style={[styles.popupMenuText, zoomIndex === actualIndex && { color: themeColor, fontWeight: 'bold' }]}>
+                                {Math.round(zl * 100)}%
+                              </Text>
+                            </TouchableOpacity>
+                          );
+                        })}
+                      </View>
+                    )}
+                  </View>
                 </>
               )}
             </View>
@@ -246,52 +510,52 @@ export default function CustomVideoPlayer({ url, isFullscreen, onToggleFullscree
                         setShowSpeedMenu(false);
                         resetControlsTimeout();
                       }}>
-                        <Text style={[styles.popupMenuText, playbackRate === r && { color: themeColor, fontWeight: 'bold' }]}>{r}x</Text>
+                        <Text style={[styles.popupMenuText, playerState.playbackRate === r && { color: themeColor, fontWeight: 'bold' }]}>{r}x</Text>
                       </TouchableOpacity>
                     ))}
                   </View>
                 )}
 
                 <TouchableOpacity style={styles.topBtn} onPress={() => { setShowSpeedMenu(!showSpeedMenu); resetControlsTimeout(); }}>
-                    <Text style={styles.speedText}>{playbackRate}x</Text>
+                    <Text style={styles.speedText}>{playerState.playbackRate}x</Text>
                 </TouchableOpacity>
                 <TouchableOpacity style={styles.topBtn} onPress={toggleMute}>
-                    <Ionicons name={isMuted || volume === 0 ? "volume-mute" : "volume-medium"} size={26} color="white" />
+                    <Ionicons name={playerState.isMuted || playerState.volume === 0 ? "volume-mute-outline" : "volume-medium-outline"} size={26} color="white" />
                 </TouchableOpacity>
             </View>
           </View>
 
           <View style={styles.centerControls} pointerEvents="box-none">
             <TouchableOpacity onPress={skipBackward} style={styles.controlBtn}>
-              <Ionicons name="play-back" size={42} color="white" />
+              <Ionicons name="play-back-outline" size={42} color="white" />
             </TouchableOpacity>
             
             <TouchableOpacity onPress={togglePlay} style={[styles.controlBtn, { marginHorizontal: 45 }]}>
-              <Ionicons name={isPlaying ? "pause-circle" : "play-circle"} size={70} color="white" />
+              <Ionicons name={playerState.isPlaying ? "pause-circle-outline" : "play-circle-outline"} size={70} color="white" />
             </TouchableOpacity>
             
             <TouchableOpacity onPress={skipForward} style={styles.controlBtn}>
-              <Ionicons name="play-forward" size={42} color="white" />
+              <Ionicons name="play-forward-outline" size={42} color="white" />
             </TouchableOpacity>
           </View>
 
           <View style={styles.bottomBar}>
-            <Text style={styles.timeText}>{formatTime(currentTime)}</Text>
+            <Text style={styles.timeText}>{formatTime(playerState.currentTime)}</Text>
             <Slider
               style={styles.slider}
               minimumValue={0}
-              maximumValue={duration > 0 ? duration : 1}
-              value={currentTime}
+              maximumValue={playerState.duration > 0 ? playerState.duration : 1}
+              value={playerState.currentTime}
               tapToSeek={true}
               onValueChange={() => { if(controlsTimeoutRef.current) clearTimeout(controlsTimeoutRef.current); }}
               onSlidingComplete={handleSeek}
               minimumTrackTintColor={themeColor}
               maximumTrackTintColor="rgba(255,255,255,0.3)"
             />
-            <Text style={styles.timeText}>{formatTime(duration)}</Text>
+            <Text style={styles.timeText}>{formatTime(playerState.duration)}</Text>
             
             <TouchableOpacity style={styles.fullScreenBtn} onPress={onToggleFullscreen}>
-              <Ionicons name={isFullscreen ? "contract" : "expand"} size={22} color="white" />
+              <Ionicons name={isFullscreen ? "contract-outline" : "expand-outline"} size={22} color="white" />
             </TouchableOpacity>
           </View>
         </View>
@@ -407,5 +671,59 @@ const styles = StyleSheet.create({
   fullScreenBtn: {
     padding: 10,
     marginLeft: 5,
-  }
+  },
+  // Resume popup styles
+  resumeOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0,0,0,0.8)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 50,
+  },
+  resumeBox: {
+    backgroundColor: '#1c1c2e',
+    borderRadius: 16,
+    padding: 25,
+    width: '85%',
+    maxWidth: 400,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.1)',
+  },
+  resumeTitle: {
+    color: 'white',
+    fontSize: 20,
+    fontWeight: 'bold',
+    marginBottom: 15,
+    textAlign: 'center',
+  },
+  resumeTimeBox: {
+    backgroundColor: '#1a1c29',
+    padding: 15,
+    borderRadius: 8,
+    marginBottom: 20,
+    width: '100%',
+  },
+  resumeTimeText: {
+    color: '#ddd',
+    textAlign: 'center',
+    fontSize: 15,
+  },
+  resumeBtnRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    width: '100%',
+  },
+  resumeBtn: {
+    flex: 1,
+    paddingVertical: 12,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  resumeBtnText: {
+    color: 'white',
+    fontWeight: 'bold',
+    fontSize: 14,
+  },
 });

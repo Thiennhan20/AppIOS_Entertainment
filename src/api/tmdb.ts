@@ -1,6 +1,5 @@
 import axios from 'axios';
 import { CONFIG } from '../constants/config';
-import { useTranslation } from 'react-i18next';
 
 const localClient = axios.create({
   baseURL: `${CONFIG.API_BASE_URL}/api/tmdb`,

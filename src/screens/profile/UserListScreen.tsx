@@ -50,10 +50,14 @@ export default function UserListScreen({ route, navigation }: any) {
     const movieId = type === 'history' ? item.contentId : item.id;
 
     const handleBlockedPress = () => {
-      Alert.alert(
-        'Notice', 
-        'Currently, you can only view data here and cannot click directly to view movie details.'
-      );
+      const mappedItem = {
+        ...item,
+        id: type === 'history' ? item.contentId : item.id,
+        poster_path: type === 'history' ? item.poster?.replace('https://image.tmdb.org/t/p/w400', '') : item.poster_path,
+        title: itemTitle,
+      };
+      
+      navigation.navigate('DetailScreen', { item: mappedItem, isTV });
     };
 
     const handleLongPress = () => {

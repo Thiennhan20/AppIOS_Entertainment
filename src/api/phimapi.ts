@@ -1,6 +1,5 @@
 import axios from 'axios';
 import { CONFIG } from '../constants/config';
-import { useTranslation } from 'react-i18next';
 
 const apiClient = axios.create({
   baseURL: `${CONFIG.API_BASE_URL}/api/server1`,
@@ -154,7 +153,8 @@ export const phimApi = {
 
       // 1. Try tmdb directly
       try {
-        const tmdbDirectData: any = await apiClient.get(`/tmdb/movie/${tmdbId}`);
+        const tmdbEndpoint = isTV ? `/tmdb/tv/${tmdbId}` : `/tmdb/movie/${tmdbId}`;
+        const tmdbDirectData: any = await apiClient.get(tmdbEndpoint);
         if (tmdbDirectData?.status === true && tmdbDirectData?.movie) {
            const apiSlug = tmdbDirectData.movie.slug;
            const detailData: any = await apiClient.get(`/detail/${apiSlug}`);

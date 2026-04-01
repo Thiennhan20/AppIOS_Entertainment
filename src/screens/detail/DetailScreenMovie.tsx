@@ -37,10 +37,13 @@ export default function DetailScreenMovie({ route, navigation }: any) {
 
   const [selectedMovie, setSelectedMovie] = useState<any>(null);
 
-  const [selectedServer, setSelectedServer] = useState<'Server 1' | 'Server 3'>('Server 1');
+  const initServer = item?.server ? (item.server.toLowerCase().includes('server3') || item.server.toLowerCase().includes('server 3') ? 'Server 3' : 'Server 1') : 'Server 1';
+  const initAudio = item?.audio ? (item.audio.toLowerCase().includes('dub') || item.audio.toLowerCase().includes('thuyết') || item.audio.toLowerCase().includes('lồng') ? 'dubbed' : 'vietsub') : 'vietsub';
+
+  const [selectedServer, setSelectedServer] = useState<'Server 1' | 'Server 3'>(initServer);
   const [showServerPicker, setShowServerPicker] = useState(false);
 
-  const [selectedAudio, setSelectedAudio] = useState<'vietsub'|'dubbed'>('vietsub');
+  const [selectedAudio, setSelectedAudio] = useState<'vietsub'|'dubbed'>(initAudio);
   const [showAudioPicker, setShowAudioPicker] = useState(false);
 
   const [alertInfo, setAlertInfo] = useState({

@@ -1,5 +1,5 @@
 import { useTranslation } from 'react-i18next';
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useMemo } from 'react';
 import { 
   StyleSheet, Text, View, Image, ScrollView, FlatList,
   TouchableOpacity, Dimensions, ActivityIndicator,
@@ -488,7 +488,7 @@ export default function HomeScreen({ navigation }: any) {
     fetchCommentsData();
   };
 
-  const renderMovieCard = (item: any, isTV = false, isHistory = false, isWatchlist = false, index: number) => {
+  const renderMovieCard = useCallback((item: any, isTV = false, isHistory = false, isWatchlist = false, index: number) => {
     const title = item.title || item.name;
     const navItem = isHistory || isWatchlist ? {
       ...item,
@@ -516,7 +516,13 @@ export default function HomeScreen({ navigation }: any) {
       };
 
       return (
-        <View style={styles.historyCard}>
+        <TouchableOpacity 
+          style={styles.historyCard}
+          onPress={() => navigation.navigate('DetailScreen', { item: navItem, isTV: navIsTV })}
+          onLongPress={handleLongPressMovie}
+          delayLongPress={400}
+          activeOpacity={0.8}
+        >
           {imgUri ? (
             <Image source={{ uri: imgUri }} style={styles.historyPoster} />
           ) : (
@@ -563,7 +569,7 @@ export default function HomeScreen({ navigation }: any) {
                <View style={[styles.progressBar, { width: `${Math.min((item.currentTime / Math.max(item.duration, 1)) * 100, 100)}%` }]} />
             </View>
           </View>
-        </View>
+        </TouchableOpacity>
       );
     }
 
@@ -611,15 +617,7 @@ export default function HomeScreen({ navigation }: any) {
         )}
       </TouchableOpacity>
     );
-  };
-
-  if (loading) {
-    return (
-      <View style={styles.container}>
-        <HomeScreenSkeleton />
-      </View>
-    );
-  }
+  }, [navigation, t]);
 
   const currentFeatured = featuredList[featuredIdx] || featuredList[0];
   const prevFeatured = featuredList[prevFeaturedIdx] || featuredList[0];
@@ -629,30 +627,32 @@ export default function HomeScreen({ navigation }: any) {
   const prevImageUri = prevFeatured?.poster_path
     ? `https://image.tmdb.org/t/p/w780${prevFeatured.poster_path}` : null;
 
-  const baseSections = [
-    { id: 'featured', type: 'FEATURED' },
-    { id: 'trending_movies', label: t('home.trending_movies'), data: trendingMovies, type: 'MOVIE_ROW', isTV: false, isHistory: false, isWatchlist: false },
-    { id: 'history', label: `▶️ ${t('home.continue_watching')}`, data: recentlyWatched, type: 'MOVIE_ROW', isTV: false, isHistory: true, isWatchlist: false },
-    { id: 'trending_tv', label: t('home.top_tv_shows'), data: trendingTV, type: 'MOVIE_ROW', isTV: true, isHistory: false, isWatchlist: false },
-    { id: 'watchlist_row', label: t('home.your_watchlist'), data: watchlist, type: 'MOVIE_ROW', isTV: false, isHistory: false, isWatchlist: true },
-    { id: 'top_comments', type: 'TOP_COMMENTS', data: topComments },
-    { id: 'recent_comments', type: 'RECENT_COMMENTS', data: recentComments },
-  ];
+  const finalSections = useMemo(() => {
+    const baseSections: any[] = [
+      { id: 'featured', type: 'FEATURED' },
+      { id: 'trending_movies', label: t('home.trending_movies'), data: trendingMovies, type: 'MOVIE_ROW', isTV: false, isHistory: false, isWatchlist: false },
+      { id: 'history', label: `▶️ ${t('home.continue_watching')}`, data: recentlyWatched, type: 'MOVIE_ROW', isTV: false, isHistory: true, isWatchlist: false },
+      { id: 'trending_tv', label: t('home.top_tv_shows'), data: trendingTV, type: 'MOVIE_ROW', isTV: true, isHistory: false, isWatchlist: false },
+      { id: 'watchlist_row', label: t('home.your_watchlist'), data: watchlist, type: 'MOVIE_ROW', isTV: false, isHistory: false, isWatchlist: true },
+      { id: 'top_comments', type: 'TOP_COMMENTS', data: topComments },
+      { id: 'recent_comments', type: 'RECENT_COMMENTS', data: recentComments },
+    ];
 
-  if (phase2Loaded) {
-    baseSections.push(
-      { id: 'upcoming', label: t('home.coming_soon'), data: upcoming, type: 'MOVIE_ROW', isTV: false, isHistory: false, isWatchlist: false },
-      { id: 'action', label: t('home.action_thriller'), data: actionMovies, type: 'MOVIE_ROW', isTV: false, isHistory: false, isWatchlist: false },
-      { id: 'anime', label: t('home.anime_animation'), data: anime, type: 'MOVIE_ROW', isTV: true, isHistory: false, isWatchlist: false },
-      { id: 'horror', label: t('home.horror_thrills'), data: horrorMovies, type: 'MOVIE_ROW', isTV: false, isHistory: false, isWatchlist: false },
-      { id: 'romance', label: t('home.sweet_romance'), data: romanceMovies, type: 'MOVIE_ROW', isTV: false, isHistory: false, isWatchlist: false },
-      { id: 'top_rated', label: t('home.top_rated'), data: topRated, type: 'MOVIE_ROW', isTV: false, isHistory: false, isWatchlist: false }
-    );
-  }
+    if (phase2Loaded) {
+      baseSections.push(
+        { id: 'upcoming', label: t('home.coming_soon'), data: upcoming, type: 'MOVIE_ROW', isTV: false, isHistory: false, isWatchlist: false },
+        { id: 'action', label: t('home.action_thriller'), data: actionMovies, type: 'MOVIE_ROW', isTV: false, isHistory: false, isWatchlist: false },
+        { id: 'anime', label: t('home.anime_animation'), data: anime, type: 'MOVIE_ROW', isTV: true, isHistory: false, isWatchlist: false },
+        { id: 'horror', label: t('home.horror_thrills'), data: horrorMovies, type: 'MOVIE_ROW', isTV: false, isHistory: false, isWatchlist: false },
+        { id: 'romance', label: t('home.sweet_romance'), data: romanceMovies, type: 'MOVIE_ROW', isTV: false, isHistory: false, isWatchlist: false },
+        { id: 'top_rated', label: t('home.top_rated'), data: topRated, type: 'MOVIE_ROW', isTV: false, isHistory: false, isWatchlist: false }
+      );
+    }
 
-  const finalSections = baseSections.filter(s => s.type === 'FEATURED' || (s.data && s.data.length > 0));
+    return baseSections.filter(s => s.type === 'FEATURED' || (s.data && s.data.length > 0));
+  }, [trendingMovies, trendingTV, recentlyWatched, watchlist, topComments, recentComments, upcoming, actionMovies, anime, horrorMovies, romanceMovies, topRated, phase2Loaded, t]);
 
-  const renderHomeSection = ({ item: section }: any) => {
+  const renderHomeSection = useCallback(({ item: section }: any) => {
     if (section.type === 'FEATURED') {
       return (
         <View style={styles.featuredContainer}>
@@ -840,7 +840,15 @@ export default function HomeScreen({ navigation }: any) {
     }
 
     return null;
-  };
+  }, [featuredList, featuredIdx, prevFeaturedIdx, fadeAnim, currentFeatured, prevFeatured, featuredImageUri, prevImageUri, themeColor, themeGradient, renderMovieCard, navigation, t]);
+
+  if (loading) {
+    return (
+      <View style={styles.container}>
+        <HomeScreenSkeleton />
+      </View>
+    );
+  }
 
   return (
     <View style={styles.container}>

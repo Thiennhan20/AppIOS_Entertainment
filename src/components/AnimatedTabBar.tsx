@@ -37,13 +37,14 @@ export function AnimatedTabBar({ state, descriptors, navigation }: any) {
       ])
     ]).start();
 
-    // 2. Breathing glow loop
-    Animated.loop(
-      Animated.sequence([
-        Animated.timing(breathing, { toValue: 1.15, duration: 1200, useNativeDriver: true }),
-        Animated.timing(breathing, { toValue: 1, duration: 1200, useNativeDriver: true })
-      ])
-    ).start();
+    // 2. Breathing pulse: play 2 cycles then stop (saves battery vs infinite loop)
+    breathing.setValue(1);
+    Animated.sequence([
+      Animated.timing(breathing, { toValue: 1.15, duration: 1200, useNativeDriver: true }),
+      Animated.timing(breathing, { toValue: 1, duration: 1200, useNativeDriver: true }),
+      Animated.timing(breathing, { toValue: 1.1, duration: 1000, useNativeDriver: true }),
+      Animated.timing(breathing, { toValue: 1, duration: 1000, useNativeDriver: true }),
+    ]).start();
 
   }, [state.index]);
 
