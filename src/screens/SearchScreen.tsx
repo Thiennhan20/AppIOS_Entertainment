@@ -4,8 +4,9 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
 import { tmdbApi } from '../api/tmdb';
-import FilterModal, { FilterState } from '../components/FilterModal';
 import LongPressMoviePopup from '../components/LongPressMoviePopup';
+import { useAuth } from '../context/AuthContext';
+import { useSearchHistory } from '../hooks/useSearchHistory';
 
 export default function SearchScreen({ navigation }: any) {
   const { t } = useTranslation();
@@ -17,8 +18,16 @@ export default function SearchScreen({ navigation }: any) {
   const [isTyping, setIsTyping] = useState(false);
   const [longPressedMovie, setLongPressedMovie] = useState<any>(null);
 
-  const [filterVisible, setFilterVisible] = useState(false);
-  const [activeFilters, setActiveFilters] = useState<FilterState>({ genreId: 0, year: 0, country: '', type: 'all' });
+  // Search history
+  const { user, registerSearchHistoryFlush } = useAuth();
+  const { displayHistory, addSearch: addToSearchHistory, removeSearch, clearAll: clearSearchHistory, flushSync } = useSearchHistory(!!user);
+
+  // Register flush callback so AuthContext can flush before logout
+  useEffect(() => {
+    if (registerSearchHistoryFlush) {
+      registerSearchHistoryFlush(flushSync);
+    }
+  }, [registerSearchHistoryFlush, flushSync]);
 
   const handleTextChange = (text: string) => {
     setQuery(text);
@@ -39,7 +48,7 @@ export default function SearchScreen({ navigation }: any) {
 
   // Execute search when debouncedQuery changes
   useEffect(() => {
-    if (!debouncedQuery.trim() && activeFilters.genreId === 0 && activeFilters.year === 0 && activeFilters.country === '') {
+    if (!debouncedQuery.trim()) {
       setResults([]);
       return;
     }
@@ -52,23 +61,8 @@ export default function SearchScreen({ navigation }: any) {
         
         if (debouncedQuery.trim()) {
           const promises = [];
-          if (activeFilters.type === 'all' || activeFilters.type === 'movie') promises.push(tmdbApi.searchMovies(debouncedQuery));
-          else promises.push(Promise.resolve({ results: [] }));
-          
-          if (activeFilters.type === 'all' || activeFilters.type === 'tv') promises.push(tmdbApi.searchTV(debouncedQuery));
-          else promises.push(Promise.resolve({ results: [] }));
-
-          const [movies, tv] = await Promise.all(promises);
-          mData = (movies as any)?.results?.map((i: any) => ({ ...i, media_type: 'movie' })) || [];
-          tData = (tv as any)?.results?.map((i: any) => ({ ...i, media_type: 'tv' })) || [];
-        } else {
-          // No query, use discover API based on filters
-          const promises = [];
-          if (activeFilters.type === 'all' || activeFilters.type === 'movie') promises.push(tmdbApi.discoverMovies(1, activeFilters));
-          else promises.push(Promise.resolve({ results: [] }));
-          
-          if (activeFilters.type === 'all' || activeFilters.type === 'tv') promises.push(tmdbApi.discoverTV(1, activeFilters));
-          else promises.push(Promise.resolve({ results: [] }));
+          promises.push(tmdbApi.searchMovies(debouncedQuery));
+          promises.push(tmdbApi.searchTV(debouncedQuery));
 
           const [movies, tv] = await Promise.all(promises);
           mData = (movies as any)?.results?.map((i: any) => ({ ...i, media_type: 'movie' })) || [];
@@ -76,20 +70,6 @@ export default function SearchScreen({ navigation }: any) {
         }
 
         let mixed = [...mData, ...tData].filter(i => i.poster_path);
-
-        // Local filtering if both text and filters exists
-        if (debouncedQuery.trim()) {
-          if (activeFilters.genreId > 0) mixed = mixed.filter(i => i.genre_ids?.includes(activeFilters.genreId));
-          if (activeFilters.year > 0) {
-            mixed = mixed.filter(i => {
-              const yearStr = i.release_date || i.first_air_date || '';
-              return yearStr.startsWith(activeFilters.year.toString());
-            });
-          }
-          if (activeFilters.country) {
-            mixed = mixed.filter(i => i.origin_country?.includes(activeFilters.country));
-          }
-        }
         
         setResults(mixed);
       } catch (err) {
@@ -101,7 +81,7 @@ export default function SearchScreen({ navigation }: any) {
     };
 
     fetchSearchResults();
-  }, [debouncedQuery, activeFilters]);
+  }, [debouncedQuery]);
 
   const renderItem = ({ item }: { item: any }) => {
     const isTV = item.media_type === 'tv';
@@ -113,7 +93,10 @@ export default function SearchScreen({ navigation }: any) {
       return (
         <TouchableOpacity 
           style={styles.autocompleteCard}
-          onPress={() => navigation.navigate('DetailScreen', { item, isTV })}
+          onPress={() => {
+            if (query.trim()) addToSearchHistory(query.trim());
+            navigation.navigate('DetailScreen', { item, isTV });
+          }}
           onLongPress={() => {
 
             setLongPressedMovie({ ...item, isTV });
@@ -139,7 +122,10 @@ export default function SearchScreen({ navigation }: any) {
     return (
       <TouchableOpacity 
         style={styles.card}
-        onPress={() => navigation.navigate('DetailScreen', { item, isTV })}
+        onPress={() => {
+          if (query.trim()) addToSearchHistory(query.trim());
+          navigation.navigate('DetailScreen', { item, isTV });
+        }}
         onLongPress={() => {
 
           setLongPressedMovie({ ...item, isTV });
@@ -172,26 +158,57 @@ export default function SearchScreen({ navigation }: any) {
             clearButtonMode="while-editing"
             value={query}
             onChangeText={handleTextChange}
+            returnKeyType="search"
+            onSubmitEditing={() => {
+              if (query.trim()) {
+                addToSearchHistory(query.trim());
+                navigation.navigate('SearchResultScreen', { query: query.trim() });
+              }
+            }}
           />
         </View>
-        <TouchableOpacity 
-          style={styles.filterIconButton}
-          onPress={() => setFilterVisible(true)}
-        >
-          <Ionicons name="options-outline" size={26} color={(activeFilters.genreId > 0 || activeFilters.year > 0 || activeFilters.country !== '' || activeFilters.type !== 'all') ? '#E50914' : 'white'} />
-        </TouchableOpacity>
       </View>
 
-      <FilterModal 
-        visible={filterVisible}
-        onClose={() => setFilterVisible(false)}
-        filters={activeFilters}
-        onApply={(f) => {
-          setActiveFilters(f);
-          setFilterVisible(false);
-        }}
-        showTypeFilter={true}
-      />
+      {/* Search History — shown when no query and no loading */}
+      {!isTyping && !loading && query.trim().length === 0 && displayHistory.length > 0 && (
+        <View style={styles.historyContainer}>
+          <View style={styles.historyHeader}>
+            <View style={styles.historyHeaderLeft}>
+              <Ionicons name="time-outline" size={16} color="#888" />
+              <Text style={styles.historyHeaderText}>{t('search.recent_searches', { defaultValue: 'Recent Searches' })}</Text>
+            </View>
+            <TouchableOpacity onPress={clearSearchHistory}>
+              <Text style={styles.historyClearText}>{t('search.clear_all', { defaultValue: 'Clear All' })}</Text>
+            </TouchableOpacity>
+          </View>
+          <FlatList
+            data={displayHistory}
+            keyExtractor={(item) => item.query}
+            style={styles.historyList}
+            keyboardShouldPersistTaps="handled"
+            renderItem={({ item }) => (
+              <TouchableOpacity
+                style={styles.historyItem}
+                onPress={() => {
+                  setQuery(item.query);
+                  navigation.navigate('SearchResultScreen', { query: item.query });
+                }}
+                activeOpacity={0.7}
+              >
+                <Ionicons name="time-outline" size={18} color="#666" style={styles.historyItemIcon} />
+                <Text style={styles.historyItemText} numberOfLines={1}>{item.query}</Text>
+                <TouchableOpacity
+                  onPress={() => removeSearch(item.query)}
+                  hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                  style={styles.historyItemDelete}
+                >
+                  <Ionicons name="close" size={16} color="#666" />
+                </TouchableOpacity>
+              </TouchableOpacity>
+            )}
+          />
+        </View>
+      )}
 
       {isTyping || loading ? (
         <View style={styles.loadingContainer}>
@@ -212,7 +229,7 @@ export default function SearchScreen({ navigation }: any) {
           removeClippedSubviews={true}
           keyboardShouldPersistTaps="handled"
         />
-      ) : (debouncedQuery.length > 0 || activeFilters.genreId > 0 || activeFilters.year > 0 || activeFilters.country !== '') ? (
+      ) : (debouncedQuery.length > 0) ? (
         <View style={styles.emptyContainer}>
           <Ionicons name="sad-outline" size={60} color="#444" />
           <Text style={styles.emptyText}>{t('search.no_movies_found')}</Text>
@@ -300,9 +317,6 @@ const styles = StyleSheet.create({
     marginTop: 15,
     fontSize: 16,
   },
-  filterIconButton: {
-    paddingLeft: 12,
-  },
   loadingText: {
     color: '#aaa',
     marginTop: 10,
@@ -352,5 +366,57 @@ const styles = StyleSheet.create({
   autoYear: {
     color: '#aaa',
     fontSize: 13,
-  }
+  },
+  // ─── Search History Styles ──────────────────────────────────
+  historyContainer: {
+    flex: 1,
+    paddingHorizontal: 15,
+  },
+  historyHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 4,
+  },
+  historyHeaderLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  historyHeaderText: {
+    color: '#888',
+    fontSize: 13,
+    fontWeight: '600',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  historyClearText: {
+    color: '#E50914',
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  historyList: {
+    flex: 1,
+  },
+  historyItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 4,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: '#2a2a35',
+  },
+  historyItemIcon: {
+    marginRight: 12,
+  },
+  historyItemText: {
+    flex: 1,
+    color: '#ddd',
+    fontSize: 15,
+  },
+  historyItemDelete: {
+    padding: 4,
+    marginLeft: 8,
+  },
 });

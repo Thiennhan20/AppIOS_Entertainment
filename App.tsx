@@ -44,6 +44,7 @@ import CustomSplashScreen from './src/screens/SplashScreen';
 import HomeScreen from './src/screens/HomeScreen';
 import DetailScreen from './src/screens/detail/DetailScreen';
 import SearchScreen from './src/screens/SearchScreen';
+import SearchResultScreen from './src/screens/SearchResultScreen';
 import ListScreen from './src/screens/ListScreen';
 import PlayerScreen from './src/screens/video_player/PlayerScreen';
 import GameScreen from './src/screens/GameScreen';
@@ -74,6 +75,7 @@ function HomeStack() {
     >
       <Stack.Screen name="HomeScreen" component={HomeScreen} />
       <Stack.Screen name="SearchScreen" component={SearchScreen} />
+      <Stack.Screen name="SearchResultScreen" component={SearchResultScreen} />
       <Stack.Screen name="ListScreen" component={ListScreen} />
       <Stack.Screen name="DetailScreen" component={DetailScreen} />
       <Stack.Screen name="PlayerScreen" component={PlayerScreen} />

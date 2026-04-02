@@ -31,8 +31,8 @@ export const tmdbApi = {
   getSimilarTV: (id: string | number) => fetchWithFallback(`/tv/${id}/similar`),
   
   // New endpoints
-  searchMovies: (query: string) => fetchWithFallback('/search/movie', { query }),
-  searchTV: (query: string) => fetchWithFallback('/search/tv', { query }),
+  searchMovies: (query: string, page: number = 1) => fetchWithFallback('/search/movie', { query, page }),
+  searchTV: (query: string, page: number = 1) => fetchWithFallback('/search/tv', { query, page }),
   getMovieCredits: (id: string | number) => fetchWithFallback(`/movie/${id}/credits`),
   getTVCredits: (id: string | number) => fetchWithFallback(`/tv/${id}/credits`),
   getMovieVideos: (id: string | number) => fetchWithFallback(`/movie/${id}/videos`),

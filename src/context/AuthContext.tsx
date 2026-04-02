@@ -66,7 +66,22 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     }
   };
 
+  // Callback for flushing search history before logout
+  let _searchHistoryFlush: (() => void) | null = null;
+
+  const registerSearchHistoryFlush = (flush: () => void) => {
+    _searchHistoryFlush = flush;
+  };
+
   const logout = async () => {
+    // Flush pending search history sync before logout
+    if (_searchHistoryFlush) {
+      try {
+        _searchHistoryFlush();
+      } catch {
+        // Best effort
+      }
+    }
     await authApi.logout();
     await AsyncStorage.removeItem('@auth_token');
     clearWatchlistCache();
@@ -74,7 +89,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   };
 
   return (
-    <AuthContext.Provider value={{ user, loading, login, register, logout, googleLogin }}>
+    <AuthContext.Provider value={{ user, loading, login, register, logout, googleLogin, registerSearchHistoryFlush }}>
       {children}
     </AuthContext.Provider>
   );
