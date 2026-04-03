@@ -58,9 +58,7 @@ export default function CustomVideoPlayer({
   const hasEverPlayedRef = useRef(false);
   const seekDebounceRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Timeline jump guard refs
-  const allowedSeekRef = useRef(false);
-  const lastKnownTimeRef = useRef(0);
+
 
   const player = useVideoPlayer(url, p => {
     p.loop = false;
@@ -106,10 +104,9 @@ export default function CustomVideoPlayer({
     setResumePopup({ show: false, savedTime: 0 });
     setCheckingResume(false);
     hasSeekedRef.current = false; // Allow seek to savedTime
-    allowedSeekRef.current = true; // Mark as user-initiated (resume)
+
     if (player && player.status === 'readyToPlay') {
       player.currentTime = seekTo;
-      lastKnownTimeRef.current = seekTo;
       hasSeekedRef.current = true;
     }
     // If not ready yet, the seek useEffect below will handle it
@@ -158,23 +155,13 @@ export default function CustomVideoPlayer({
     }).start();
   }, [zoomIndex, isFullscreen]);
 
-  // ─── Polling state (500ms) + Timeline jump guard + Pause detection ──────────
+  // ─── Polling state (500ms) + Pause detection ──────────
   const wasPreviouslyPlayingRef = useRef(false);
 
   useEffect(() => {
     const interval = setInterval(() => {
       if (player) {
         const newTime = player.currentTime || 0;
-        const delta = Math.abs(newTime - lastKnownTimeRef.current);
-
-        // Timeline jump guard: block unexpected jumps > 3s
-        if (lastKnownTimeRef.current > 0 && delta > 3 && !allowedSeekRef.current) {
-          try { player.currentTime = lastKnownTimeRef.current; } catch {}
-          return;
-        }
-
-        allowedSeekRef.current = false;
-        lastKnownTimeRef.current = newTime;
 
         // Batch all player state into a single setState
         setPlayerState({
@@ -279,30 +266,24 @@ export default function CustomVideoPlayer({
   };
 
   const skipBackward = () => {
-    allowedSeekRef.current = true;
     if (player) {
       player.currentTime = Math.max((player.currentTime || 0) - 10, 0);
-      lastKnownTimeRef.current = player.currentTime;
     }
     triggerSeekSave();
     resetControlsTimeout();
   };
   
   const skipForward = () => {
-    allowedSeekRef.current = true;
     if (player) {
       player.currentTime = Math.min((player.currentTime || 0) + 10, player.duration || 0);
-      lastKnownTimeRef.current = player.currentTime;
     }
     triggerSeekSave();
     resetControlsTimeout();
   };
 
   const handleSeek = (value: number) => {
-    allowedSeekRef.current = true;
     if (player) {
       player.currentTime = value;
-      lastKnownTimeRef.current = value;
     }
     triggerSeekSave();
     resetControlsTimeout();

@@ -64,11 +64,9 @@ export const authApi = {
     return response.data;
   },
 
-  getRecentlyWatchedItem: async (contentId: string, server: string, audio: string, isTVShow?: boolean, season?: number, episode?: number) => {
+  getRecentlyWatchedItem: async (contentId: string, _server: string, _audio: string, isTVShow?: boolean, season?: number, episode?: number) => {
     const params = new URLSearchParams();
     params.append('contentId', contentId.toString());
-    params.append('server', server.toLowerCase().replace(/\s/g, ''));
-    params.append('audio', audio.toLowerCase());
     if (isTVShow !== undefined) params.append('isTVShow', isTVShow.toString());
     if (season !== undefined) params.append('season', season.toString());
     if (episode !== undefined) params.append('episode', episode.toString());
