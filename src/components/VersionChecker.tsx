@@ -6,7 +6,6 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 // Ví dụ: tài khoản 'nhannt22', repo 'ios-app'
 const GITHUB_OWNER = 'Thiennhan20';
 const GITHUB_REPO = 'AppIOS_Entertainment';
-const APP_INIT_TIME = Date.now();
 
 interface VersionInfo {
   hash: string;
@@ -25,21 +24,25 @@ export default function VersionChecker() {
       if (!res.ok) return;
       const data = await res.json();
       
-      const commitTimestamp = new Date(data.commit.author.date).getTime();
       const commitHash = data.sha;
       const commitMessage = data.commit.message;
 
-      // Nếu bản cập nhật trên Github làm ra TRƯỚC LÚC hoặc CÙNG LÚC mở app -> Dẹp, không báo
-      if (commitTimestamp <= APP_INIT_TIME) return;
-
-      // Check if already notified 
+      // Đọc mã hash cũ đã lưu trong máy
       const notified = await AsyncStorage.getItem('notified_hash');
+      
+      // Nếu là lần ĐẦU TIÊN tải app về (hoặc clear data), lấy mã hiện tại trên github làm mốc (Baseline) để không làm phiền user
+      if (!notified) {
+        await AsyncStorage.setItem('notified_hash', commitHash);
+        return;
+      }
+
+      // Nếu mã đã lưu giống mã mới nhất -> Dẹp, không báo
       if (notified === commitHash) return;
 
       setServerVersion({
         hash: commitHash,
         message: commitMessage,
-        date: commitTimestamp
+        date: new Date(data.commit.author.date).getTime()
       });
       setShowModal(true);
     } catch {
