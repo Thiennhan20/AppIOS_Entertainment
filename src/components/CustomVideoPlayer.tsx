@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Animated, AppState, AppStateStatus } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Animated, AppState, AppStateStatus, ActivityIndicator } from 'react-native';
 import { useVideoPlayer, VideoView } from 'expo-video';
 import { Ionicons } from '@expo/vector-icons';
 import Slider from '@react-native-community/slider';
@@ -45,6 +45,11 @@ export default function CustomVideoPlayer({
   // Resume popup state
   const [resumePopup, setResumePopup] = useState<{ show: boolean; savedTime: number }>({ show: false, savedTime: 0 });
   const [checkingResume, setCheckingResume] = useState(true);
+  const resumeSavedTimeRef = useRef(0);
+  const [resumeSeekPending, setResumeSeekPending] = useState(false);
+  const [showResumeSkip, setShowResumeSkip] = useState(false);
+  const resumeTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const resumeSkipTimerRef = useRef<NodeJS.Timeout | null>(null);
 
   const scaleAnim = useRef(new Animated.Value(1)).current;
   const videoViewRef = useRef<VideoView>(null);
@@ -101,31 +106,77 @@ export default function CustomVideoPlayer({
   // ─── Resume handlers ────────────────────────────────────
   const handleResumeContinue = () => {
     const seekTo = resumePopup.savedTime;
+    resumeSavedTimeRef.current = seekTo;
     setResumePopup({ show: false, savedTime: 0 });
     setCheckingResume(false);
-    hasSeekedRef.current = false; // Allow seek to savedTime
+    setResumeSeekPending(true);
+    setShowResumeSkip(false);
+    hasSeekedRef.current = false;
 
-    if (player && player.status === 'readyToPlay') {
-      player.currentTime = seekTo;
-      hasSeekedRef.current = true;
-    }
-    // If not ready yet, the seek useEffect below will handle it
-    player.play();
+    // Show skip option after 5s
+    resumeSkipTimerRef.current = setTimeout(() => setShowResumeSkip(true), 5000);
+    // Hard timeout 15s — play from wherever
+    resumeTimeoutRef.current = setTimeout(() => {
+      setResumeSeekPending(false);
+      setShowResumeSkip(false);
+      try { player.play(); } catch {}
+    }, 15000);
+
+    // Try immediate seek if ready
+    try {
+      if (player && player.status === 'readyToPlay') {
+        player.currentTime = seekTo;
+        hasSeekedRef.current = true;
+      }
+    } catch {}
   };
 
   const handleResumeStartOver = () => {
     setResumePopup({ show: false, savedTime: 0 });
     setCheckingResume(false);
-    player.play();
+    resumeSavedTimeRef.current = 0;
+    try { player.play(); } catch {}
   };
 
-  // ─── Seek to resume point when player is ready ──────────
+  const handleResumeSkip = () => {
+    setResumeSeekPending(false);
+    setShowResumeSkip(false);
+    if (resumeTimeoutRef.current) { clearTimeout(resumeTimeoutRef.current); resumeTimeoutRef.current = null; }
+    if (resumeSkipTimerRef.current) { clearTimeout(resumeSkipTimerRef.current); resumeSkipTimerRef.current = null; }
+    resumeSavedTimeRef.current = 0;
+    try { if (player) player.currentTime = 0; } catch {}
+  };
+
+  // ─── Resume seek: poll until currentTime matches target, then play ──
   useEffect(() => {
-    if (player && player.status === 'readyToPlay' && resumePopup.savedTime > 0 && !hasSeekedRef.current && !resumePopup.show && !checkingResume) {
-      player.currentTime = resumePopup.savedTime;
-      hasSeekedRef.current = true;
-    }
-  }, [player, player.status, resumePopup.savedTime, resumePopup.show, checkingResume]);
+    if (!resumeSeekPending) return;
+    const targetTime = resumeSavedTimeRef.current;
+    if (targetTime <= 0) { setResumeSeekPending(false); try { player.play(); } catch {} return; }
+
+    const pollId = setInterval(() => {
+      try {
+        if (!player) return;
+        // Attempt seek when player is ready
+        if (player.status === 'readyToPlay' && !hasSeekedRef.current) {
+          player.currentTime = targetTime;
+          hasSeekedRef.current = true;
+        }
+        if (!hasSeekedRef.current) return;
+        // Verify seek landed close enough
+        const current = player.currentTime || 0;
+        if (Math.abs(current - targetTime) < 2) {
+          clearInterval(pollId);
+          if (resumeTimeoutRef.current) { clearTimeout(resumeTimeoutRef.current); resumeTimeoutRef.current = null; }
+          if (resumeSkipTimerRef.current) { clearTimeout(resumeSkipTimerRef.current); resumeSkipTimerRef.current = null; }
+          setResumeSeekPending(false);
+          setShowResumeSkip(false);
+          player.play();
+        }
+      } catch { clearInterval(pollId); }
+    }, 300);
+
+    return () => clearInterval(pollId);
+  }, [resumeSeekPending, player]);
 
   useFocusEffect(
     React.useCallback(() => {
@@ -384,7 +435,7 @@ export default function CustomVideoPlayer({
               style={styles.video}
               player={player}
               nativeControls={false}
-              allowsFullscreen={false}
+              fullscreenOptions={{ enable: false }}
               allowsPictureInPicture={true}
               startsPictureInPictureAutomatically={true}
               contentFit="contain"
@@ -392,10 +443,23 @@ export default function CustomVideoPlayer({
           </Animated.View>
       </View>
 
-      {/* Resume Popup — inside player */}
-      {(checkingResume || resumePopup.show) && (
+      {/* Resume Popup / Seek Loading — inside player */}
+      {(checkingResume || resumePopup.show || resumeSeekPending) && (
         <View style={styles.resumeOverlay}>
-          {checkingResume && !resumePopup.show ? (
+          {resumeSeekPending ? (
+            <View style={styles.resumeBox}>
+              <ActivityIndicator size="large" color="white" style={{ marginBottom: 15 }} />
+              <Text style={{ color: '#ddd', fontSize: 14, textAlign: 'center' }}>Đang tải tới vị trí đã xem...</Text>
+              {showResumeSkip && (
+                <TouchableOpacity
+                  style={[styles.resumeBtn, { backgroundColor: '#f59e0b', marginTop: 15, width: '100%' }]}
+                  onPress={handleResumeSkip}
+                >
+                  <Text style={styles.resumeBtnText}>Bỏ qua, xem từ đầu</Text>
+                </TouchableOpacity>
+              )}
+            </View>
+          ) : checkingResume && !resumePopup.show ? (
             <View style={styles.resumeBox}>
               <Text style={{ color: '#aaa', fontSize: 14 }}>Checking...</Text>
             </View>
@@ -429,7 +493,7 @@ export default function CustomVideoPlayer({
         </View>
       )}
 
-      {showControls && !checkingResume && !resumePopup.show && (
+      {showControls && !checkingResume && !resumePopup.show && !resumeSeekPending && (
         <View style={styles.overlay} pointerEvents="box-none">
           <LinearGradient
             colors={['rgba(0,0,0,0.85)', 'transparent', 'rgba(0,0,0,0.85)']}
