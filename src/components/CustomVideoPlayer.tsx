@@ -5,6 +5,7 @@ import { Ionicons } from '@expo/vector-icons';
 import Slider from '@react-native-community/slider';
 import { useFocusEffect } from '@react-navigation/native';
 import { LinearGradient } from 'expo-linear-gradient';
+import { useTranslation } from 'react-i18next';
 import { authApi } from '../api/authApi';
 
 interface CustomVideoPlayerProps {
@@ -12,7 +13,6 @@ interface CustomVideoPlayerProps {
   isFullscreen: boolean;
   onToggleFullscreen: () => void;
   themeColor: string;
-  // Save progress props
   movieId?: string;
   server?: string;
   audio?: string;
@@ -27,6 +27,7 @@ export default function CustomVideoPlayer({
   url, isFullscreen, onToggleFullscreen, themeColor,
   movieId, server, audio, isTVShow, season, episode, title, poster
 }: CustomVideoPlayerProps) {
+  const { t } = useTranslation();
   const [showControls, setShowControls] = useState(true);
   const [playerState, setPlayerState] = useState({
     currentTime: 0,
@@ -449,28 +450,28 @@ export default function CustomVideoPlayer({
           {resumeSeekPending ? (
             <View style={styles.resumeBox}>
               <ActivityIndicator size="large" color="white" style={{ marginBottom: 15 }} />
-              <Text style={{ color: '#ddd', fontSize: 14, textAlign: 'center' }}>Đang tải tới vị trí đã xem...</Text>
+              <Text style={{ color: '#ddd', fontSize: 14, textAlign: 'center' }}>{t('Loading to last watched position...')}</Text>
               {showResumeSkip && (
                 <TouchableOpacity
                   style={[styles.resumeBtn, { backgroundColor: '#f59e0b', marginTop: 15, width: '100%' }]}
                   onPress={handleResumeSkip}
                 >
-                  <Text style={styles.resumeBtnText}>Bỏ qua, xem từ đầu</Text>
+                  <Text style={styles.resumeBtnText}>{t('Skip, watch from beginning')}</Text>
                 </TouchableOpacity>
               )}
             </View>
           ) : checkingResume && !resumePopup.show ? (
             <View style={styles.resumeBox}>
-              <Text style={{ color: '#aaa', fontSize: 14 }}>Checking...</Text>
+              <Text style={{ color: '#aaa', fontSize: 14 }}>{t('Checking...')}</Text>
             </View>
           ) : (
             <View style={styles.resumeBox}>
-              <Text style={styles.resumeTitle}>THÔNG BÁO!</Text>
+              <Text style={styles.resumeTitle}>{t('RESUME PLAYBACK')}</Text>
               <View style={styles.resumeTimeBox}>
                 <Text style={styles.resumeTimeText}>
-                  Bạn đã dừng lại ở{' '}
+                  {t('You stopped at')}
                   <Text style={{ color: '#f59e0b', fontWeight: 'bold' }}>
-                    {Math.floor(resumePopup.savedTime / 60)} phút {Math.floor(resumePopup.savedTime % 60)} giây
+                    {' '}{Math.floor(resumePopup.savedTime / 60)}{t('m')} {Math.floor(resumePopup.savedTime % 60)}{t('s')}
                   </Text>
                 </Text>
               </View>
@@ -479,13 +480,13 @@ export default function CustomVideoPlayer({
                   style={[styles.resumeBtn, { backgroundColor: '#10b981', marginRight: 10 }]}
                   onPress={handleResumeContinue}
                 >
-                  <Text style={styles.resumeBtnText}>Tiếp tục xem</Text>
+                  <Text style={styles.resumeBtnText}>{t('Resume playing')}</Text>
                 </TouchableOpacity>
                 <TouchableOpacity
                   style={[styles.resumeBtn, { backgroundColor: '#f59e0b' }]}
                   onPress={handleResumeStartOver}
                 >
-                  <Text style={styles.resumeBtnText}>Xem lại từ đầu</Text>
+                  <Text style={styles.resumeBtnText}>{t('Start over')}</Text>
                 </TouchableOpacity>
               </View>
             </View>

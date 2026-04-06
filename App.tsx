@@ -60,6 +60,7 @@ import RegisterScreen from './src/screens/auth/RegisterScreen';
 import ForgotPasswordScreen from './src/screens/auth/ForgotPasswordScreen';
 
 import { AnimatedTabBar } from './src/components/AnimatedTabBar';
+import VersionChecker from './src/components/VersionChecker';
 
 const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
@@ -188,6 +189,7 @@ export default function App() {
           <ToastProvider>
             <AppNavigator />
             {showSplash && <CustomSplashScreen onFinish={() => setShowSplash(false)} />}
+            <VersionChecker />
           </ToastProvider>
         </ThemeProvider>
       </AuthProvider>
