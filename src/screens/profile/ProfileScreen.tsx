@@ -6,7 +6,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
 import { LinearGradient } from 'expo-linear-gradient';
-
+import Constants from 'expo-constants';
 export default function ProfileScreen({ navigation }: any) {
   const { t } = useTranslation();
   const { user, logout } = useAuth();
@@ -129,8 +129,14 @@ export default function ProfileScreen({ navigation }: any) {
 
       </View>
 
+        <View style={{ alignItems: 'center', marginTop: 25, marginBottom: 5 }}>
+          <Text style={{ color: '#666', fontSize: 13, fontFamily: 'monospace' }}>
+            App Version: {Constants.expoConfig?.version || '1.0.0'}
+          </Text>
+        </View>
+
         <TouchableOpacity 
-          style={[styles.logoutButton, { borderColor: themeColor, backgroundColor: `${themeColor}1A` }]} 
+          style={[styles.logoutButton, { borderColor: themeColor, backgroundColor: `${themeColor}1A`, marginTop: 10 }]} 
           onPress={handleLogoutPress}
         >
           <Text style={[styles.logoutText, { color: themeColor }]}>{t('profile.logout')}</Text>
