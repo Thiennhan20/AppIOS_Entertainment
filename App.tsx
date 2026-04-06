@@ -30,9 +30,7 @@ console.log = (...args) => {
   originalLog(...args);
 };
 
-if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
-  UIManager.setLayoutAnimationEnabledExperimental(true);
-}
+// Legacy LayoutAnimation enable block removed for New Architecture compatibility
 
 import './src/i18n';
 import { useTranslation } from 'react-i18next';
@@ -54,6 +52,7 @@ import StreamingScreen from './src/screens/StreamingScreen';
 import SettingsScreen from './src/screens/profile/SettingsScreen';
 import HelpScreen from './src/screens/profile/HelpScreen';
 import UserListScreen from './src/screens/profile/UserListScreen';
+import UserCommentsScreen from './src/screens/profile/UserCommentsScreen';
 
 import LoginScreen from './src/screens/auth/LoginScreen';
 import RegisterScreen from './src/screens/auth/RegisterScreen';
@@ -113,6 +112,7 @@ function ProfileStack() {
       <Stack.Screen name="SettingsScreen" component={SettingsScreen} />
       <Stack.Screen name="HelpScreen" component={HelpScreen} />
       <Stack.Screen name="UserListScreen" component={UserListScreen} />
+      <Stack.Screen name="UserCommentsScreen" component={UserCommentsScreen} />
       <Stack.Screen name="ListScreen" component={ListScreen} />
       <Stack.Screen name="DetailScreen" component={DetailScreen} />
       <Stack.Screen name="PlayerScreen" component={PlayerScreen} />

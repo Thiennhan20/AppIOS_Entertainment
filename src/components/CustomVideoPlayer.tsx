@@ -450,28 +450,28 @@ export default function CustomVideoPlayer({
           {resumeSeekPending ? (
             <View style={styles.resumeBox}>
               <ActivityIndicator size="large" color="white" style={{ marginBottom: 15 }} />
-              <Text style={{ color: '#ddd', fontSize: 14, textAlign: 'center' }}>{t('Loading to last watched position...')}</Text>
+              <Text style={{ color: '#ddd', fontSize: 14, textAlign: 'center' }}>{t('player.loading_to_last_watched', { defaultValue: 'Loading to last watched position...' })}</Text>
               {showResumeSkip && (
                 <TouchableOpacity
                   style={[styles.resumeBtn, { backgroundColor: '#f59e0b', marginTop: 15, width: '100%' }]}
                   onPress={handleResumeSkip}
                 >
-                  <Text style={styles.resumeBtnText}>{t('Skip, watch from beginning')}</Text>
+                  <Text style={styles.resumeBtnText}>{t('player.skip_watch_from_beginning', { defaultValue: 'Skip, watch from beginning' })}</Text>
                 </TouchableOpacity>
               )}
             </View>
           ) : checkingResume && !resumePopup.show ? (
             <View style={styles.resumeBox}>
-              <Text style={{ color: '#aaa', fontSize: 14 }}>{t('Checking...')}</Text>
+              <Text style={{ color: '#aaa', fontSize: 14 }}>{t('player.checking', { defaultValue: 'Checking...' })}</Text>
             </View>
           ) : (
             <View style={styles.resumeBox}>
-              <Text style={styles.resumeTitle}>{t('RESUME PLAYBACK')}</Text>
+              <Text style={styles.resumeTitle}>{t('player.resume_playback', { defaultValue: 'RESUME PLAYBACK' })}</Text>
               <View style={styles.resumeTimeBox}>
                 <Text style={styles.resumeTimeText}>
-                  {t('You stopped at')}
+                  {t('player.you_stopped_at', { defaultValue: 'You stopped at' })}
                   <Text style={{ color: '#f59e0b', fontWeight: 'bold' }}>
-                    {' '}{Math.floor(resumePopup.savedTime / 60)}{t('m')} {Math.floor(resumePopup.savedTime % 60)}{t('s')}
+                    {' '}{Math.floor(resumePopup.savedTime / 60)}{t('player.minute_short', { defaultValue: 'm' })} {Math.floor(resumePopup.savedTime % 60)}{t('player.second_short', { defaultValue: 's' })}
                   </Text>
                 </Text>
               </View>
@@ -480,13 +480,13 @@ export default function CustomVideoPlayer({
                   style={[styles.resumeBtn, { backgroundColor: '#10b981', marginRight: 10 }]}
                   onPress={handleResumeContinue}
                 >
-                  <Text style={styles.resumeBtnText}>{t('Resume playing')}</Text>
+                  <Text style={styles.resumeBtnText}>{t('player.resume_playing', { defaultValue: 'Resume playing' })}</Text>
                 </TouchableOpacity>
                 <TouchableOpacity
                   style={[styles.resumeBtn, { backgroundColor: '#f59e0b' }]}
                   onPress={handleResumeStartOver}
                 >
-                  <Text style={styles.resumeBtnText}>{t('Start over')}</Text>
+                  <Text style={styles.resumeBtnText}>{t('player.start_over', { defaultValue: 'Start over' })}</Text>
                 </TouchableOpacity>
               </View>
             </View>

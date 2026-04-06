@@ -18,6 +18,7 @@ import { nguoncApi } from '../../api/nguonc';
 import { authApi } from '../../api/authApi';
 import CustomAlert from '../../components/CustomAlert';
 import CustomVideoPlayer from '../../components/CustomVideoPlayer';
+import Comments from '../../components/Comments';
 
 const { width, height } = Dimensions.get('window');
 
@@ -344,36 +345,10 @@ export default function PlayerScreenTVShow({ route, navigation }: any) {
 
             {commentsVisible && (
               <View style={styles.commentsContainer}>
-                <Text style={styles.commentsHeader}>{t('player.comments')}</Text>
-                {comments.map((c, i) => (
-                  <View key={i} style={styles.commentItem}>
-                    <View style={styles.commentAvatar}>
-                      <Text style={{color:'white', fontWeight:'bold'}}>{c.user.charAt(0)}</Text>
-                    </View>
-                    <View style={styles.commentBody}>
-                      <Text style={styles.commentUser}>{c.user}</Text>
-                      <Text style={styles.commentText}>{c.text}</Text>
-                    </View>
-                  </View>
-                ))}
+                 <Comments movieId={item.id} type={isTV ? 'tvshow' : 'movie'} title={titleState} />
               </View>
             )}
           </ScrollView>
-        )}
-
-        {!isFullscreen && commentsVisible && (
-          <View style={[styles.inputContainer, { paddingBottom: insets.bottom || 10 }]}>
-            <TextInput 
-              style={styles.textInput}
-              placeholder={t('player.write_comment', { defaultValue: 'Write a comment...' })}
-              placeholderTextColor="#666"
-              value={newComment}
-              onChangeText={setNewComment}
-            />
-            <TouchableOpacity style={[styles.sendButton, { backgroundColor: themeColor }]} onPress={addComment}>
-              <Ionicons name="send" size={20} color="white" />
-            </TouchableOpacity>
-          </View>
         )}
       </View>
     </KeyboardAvoidingView>

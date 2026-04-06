@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { View, Text, StyleSheet, FlatList, TouchableOpacity, Image, ActivityIndicator } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -6,6 +6,7 @@ import { useTranslation } from 'react-i18next';
 import { tmdbApi } from '../api/tmdb';
 import FilterModal, { FilterState } from '../components/FilterModal';
 import LongPressMoviePopup from '../components/LongPressMoviePopup';
+import ScrollToTopButton from '../components/ScrollToTopButton';
 
 export default function SearchResultScreen({ route, navigation }: any) {
   const insets = useSafeAreaInsets();
@@ -22,6 +23,15 @@ export default function SearchResultScreen({ route, navigation }: any) {
   const [activeFilters, setActiveFilters] = useState<FilterState>({ genreId: 0, year: 0, country: '', type: 'all' });
 
   const [longPressedMovie, setLongPressedMovie] = useState<any>(null);
+
+  const scrollRef = useRef<FlatList>(null);
+  const [showScrollTop, setShowScrollTop] = useState(false);
+
+  const handleScroll = (event: any) => {
+    const offsetY = event.nativeEvent.contentOffset.y;
+    if (offsetY > 300 && !showScrollTop) setShowScrollTop(true);
+    if (offsetY <= 300 && showScrollTop) setShowScrollTop(false);
+  };
 
   useEffect(() => {
     setData([]);
@@ -156,6 +166,9 @@ export default function SearchResultScreen({ route, navigation }: any) {
         </View>
       ) : (
         <FlatList
+          ref={scrollRef}
+          onScroll={handleScroll}
+          scrollEventThrottle={16}
           data={data}
           keyExtractor={(item, index) => `${item.id}-${index}`}
           numColumns={3}
@@ -181,6 +194,11 @@ export default function SearchResultScreen({ route, navigation }: any) {
       <LongPressMoviePopup 
         movie={longPressedMovie} 
         onClose={() => setLongPressedMovie(null)} 
+      />
+
+      <ScrollToTopButton 
+        visible={showScrollTop} 
+        onPress={() => scrollRef.current?.scrollToOffset({ offset: 0, animated: true })}
       />
     </View>
   );

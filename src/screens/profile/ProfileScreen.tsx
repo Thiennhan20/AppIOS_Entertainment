@@ -92,6 +92,15 @@ export default function ProfileScreen({ navigation }: any) {
           <Ionicons name="chevron-forward" size={20} color="#555" />
         </TouchableOpacity>
 
+        <TouchableOpacity 
+          style={styles.menuItem}
+          onPress={() => navigation.navigate('UserCommentsScreen')}
+        >
+          <Ionicons name="chatbubbles-outline" size={24} color="#ccc" style={styles.menuIcon} />
+          <Text style={styles.menuText}>{t('profile.my_comments', { defaultValue: 'My Comments' })}</Text>
+          <Ionicons name="chevron-forward" size={20} color="#555" />
+        </TouchableOpacity>
+
         <TouchableOpacity style={styles.menuItem} onPress={() => navigation.navigate('HelpScreen')}>
           <Ionicons name="help-circle-outline" size={24} color="#ccc" style={styles.menuIcon} />
           <Text style={styles.menuText}>{t('profile.help_support')}</Text>

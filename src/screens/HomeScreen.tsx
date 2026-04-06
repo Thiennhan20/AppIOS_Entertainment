@@ -17,7 +17,7 @@ import { useToast } from '../context/ToastContext';
 import { commentsApi } from '../api/commentsApi';
 import LongPressMoviePopup from '../components/LongPressMoviePopup';
 import WatchlistButton from '../components/WatchlistButton';
-
+import ScrollToTopButton from '../components/ScrollToTopButton';
 const { width, height } = Dimensions.get('window');
 const DEFAULT_FEATURED = require('../../assets/splash-icon.png');
 
@@ -294,6 +294,15 @@ export default function HomeScreen({ navigation }: any) {
 
   const [topComments,    setTopComments]    = useState<any[]>([]);
   const [recentComments, setRecentComments] = useState<any[]>([]);
+
+  const flatListRef = React.useRef<FlatList>(null);
+  const [showScrollTop, setShowScrollTop] = useState(false);
+
+  const handleScroll = (event: any) => {
+    const offsetY = event.nativeEvent.contentOffset.y;
+    if (offsetY > 300 && !showScrollTop) setShowScrollTop(true);
+    if (offsetY <= 300 && showScrollTop) setShowScrollTop(false);
+  };
 
   const [loading,        setLoading]        = useState(true);
   const [refreshing,     setRefreshing]     = useState(false);
@@ -760,7 +769,20 @@ export default function HomeScreen({ navigation }: any) {
             data={section.data}
             keyExtractor={(item) => `top-${item._id}`}
             renderItem={({ item, index }) => (
-              <View style={styles.topCommentCard}>
+              <TouchableOpacity 
+                style={styles.topCommentCard}
+                activeOpacity={0.8}
+                onPress={() => {
+                  navigation.navigate('DetailScreen', {
+                    item: {
+                      id: item.movieId,
+                      title: item.movieTitle,
+                      poster_path: item.moviePoster ? item.moviePoster.replace('https://image.tmdb.org/t/p/w200', '') : null
+                    },
+                    isTV: item.type === 'tv' || item.type === 'tvshow'
+                  });
+                }}
+              >
                 <Ionicons name="trophy" size={80} color="rgba(229, 9, 20, 0.08)" style={styles.topQuoteIcon} />
                 <View style={styles.movieContextBar}>
                   {item.moviePoster && <Image source={{ uri: item.moviePoster }} style={styles.contextPoster} />}
@@ -790,7 +812,7 @@ export default function HomeScreen({ navigation }: any) {
                     <Text style={styles.topRankText}>#{index + 1}</Text>
                   </View>
                 </View>
-              </View>
+              </TouchableOpacity>
             )}
             initialNumToRender={2}
             maxToRenderPerBatch={3}
@@ -811,7 +833,20 @@ export default function HomeScreen({ navigation }: any) {
             data={section.data}
             keyExtractor={(item) => `recent-${item._id}`}
             renderItem={({ item }) => (
-              <View style={styles.recentCommentCard}>
+              <TouchableOpacity 
+                style={styles.recentCommentCard}
+                activeOpacity={0.8}
+                onPress={() => {
+                  navigation.navigate('DetailScreen', {
+                    item: {
+                      id: item.movieId,
+                      title: item.movieTitle,
+                      poster_path: item.moviePoster ? item.moviePoster.replace('https://image.tmdb.org/t/p/w200', '') : null
+                    },
+                    isTV: item.type === 'tv' || item.type === 'tvshow'
+                  });
+                }}
+              >
                 <View style={styles.recentHeader}>
                   <View style={styles.recentAvatarContainer}>
                     <Image source={{ uri: item.user?.avatar || 'https://i.pravatar.cc/150' }} style={styles.recentAvatar} />
@@ -829,7 +864,7 @@ export default function HomeScreen({ navigation }: any) {
                 <View style={styles.recentContentBubble}>
                   <Text style={styles.recentContentText} numberOfLines={3}>{item.content}</Text>
                 </View>
-              </View>
+              </TouchableOpacity>
             )}
             initialNumToRender={2}
             maxToRenderPerBatch={3}
@@ -888,6 +923,9 @@ export default function HomeScreen({ navigation }: any) {
 
       {/* ── Scrollable content ── */}
       <FlatList
+        ref={flatListRef}
+        onScroll={handleScroll}
+        scrollEventThrottle={16}
         data={finalSections}
         keyExtractor={(item) => item.id}
         renderItem={renderHomeSection}
@@ -943,6 +981,13 @@ export default function HomeScreen({ navigation }: any) {
         onClose={() => setLongPressedMovie(null)} 
         onWatchlistUpdated={() => fetchUserData()}
       />
+
+      <ScrollToTopButton 
+        visible={showScrollTop} 
+        onPress={() => flatListRef.current?.scrollToOffset({ offset: 0, animated: true })}
+        bottomOffset={85} 
+      />
+
 
     </View>
   );

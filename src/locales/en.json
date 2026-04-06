@@ -86,7 +86,16 @@
     "close": "Close",
     "write_comment": "Write a comment...",
     "close_comments": "Close Comments",
-    "open_comments": "Open Comments"
+    "open_comments": "Open Comments",
+    "resume_playback": "RESUME PLAYBACK",
+    "you_stopped_at": "You stopped at",
+    "minute_short": "m",
+    "second_short": "s",
+    "resume_playing": "Resume playing",
+    "start_over": "Start over",
+    "skip_watch_from_beginning": "Skip, watch from beginning",
+    "checking": "Checking...",
+    "loading_to_last_watched": "Loading to last watched position..."
   },
   "watchlist": {
     "added": "Added to Watchlist!",

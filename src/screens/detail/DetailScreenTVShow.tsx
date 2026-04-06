@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { 
   StyleSheet, Text, View, Image, ScrollView, FlatList,
   TouchableOpacity, Dimensions, ActivityIndicator, Modal, Alert
@@ -17,11 +17,22 @@ import { useTheme } from '../../context/ThemeContext';
 import WatchlistButton from '../../components/WatchlistButton';
 import LongPressMoviePopup from '../../components/LongPressMoviePopup';
 import CustomAlert from '../../components/CustomAlert';
+import Comments from '../../components/Comments';
+import ScrollToTopButton from '../../components/ScrollToTopButton';
 
 const { width, height } = Dimensions.get('window');
 
 export default function DetailScreenTVShow({ route, navigation }: any) {
   const { t } = useTranslation();
+
+  const scrollRef = useRef<ScrollView>(null);
+  const [showScrollTop, setShowScrollTop] = useState(false);
+
+  const handleScroll = (event: any) => {
+    const offsetY = event.nativeEvent.contentOffset.y;
+    if (offsetY > 300 && !showScrollTop) setShowScrollTop(true);
+    if (offsetY <= 300 && showScrollTop) setShowScrollTop(false);
+  };
   const { themeColor } = useTheme();
   const { item, isTV } = route.params;
   const [details, setDetails] = useState<any>(null);
@@ -246,7 +257,11 @@ export default function DetailScreenTVShow({ route, navigation }: any) {
 
   return (
     <View style={styles.container}>
-      <ScrollView>
+      <ScrollView
+        ref={scrollRef}
+        onScroll={handleScroll}
+        scrollEventThrottle={16}
+      >
         {/* Backdrop */}
         <View style={styles.backdropContainer}>
           <Image source={{ uri: featuredImageUri }} style={styles.backdropImage} />
@@ -426,6 +441,11 @@ export default function DetailScreenTVShow({ route, navigation }: any) {
             </View>
           )}
           
+          {/* Comments Section */}
+          <View style={[styles.sectionContainer, { marginTop: 30 }]}>
+            <Comments movieId={item.id} type="tvshow" title={title} />
+          </View>
+
           <View style={{height: 40}} />
         </View>
       </ScrollView>
@@ -519,7 +539,12 @@ export default function DetailScreenTVShow({ route, navigation }: any) {
         isError={alertInfo.isError}
         onClose={() => setAlertInfo(prev => ({ ...prev, visible: false }))}
       />
-
+      
+      <ScrollToTopButton 
+        visible={showScrollTop} 
+        onPress={() => scrollRef.current?.scrollTo({ y: 0, animated: true })}
+        bottomOffset={20} 
+      />
     </View>
   );
 }

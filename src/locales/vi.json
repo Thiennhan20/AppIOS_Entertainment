@@ -86,7 +86,16 @@
     "close": "Đóng",
     "write_comment": "Bình luận tại đây...",
     "close_comments": "Đóng Khu Vực Bình Luận",
-    "open_comments": "Mở Khu Vực Bình Luận"
+    "open_comments": "Mở Khu Vực Bình Luận",
+    "resume_playback": "TIẾP TỤC XEM",
+    "you_stopped_at": "Bạn đã dừng lại ở",
+    "minute_short": "p",
+    "second_short": "s",
+    "resume_playing": "Phát tiếp",
+    "start_over": "Xem lại từ đầu",
+    "skip_watch_from_beginning": "Bỏ qua, xem lại từ đầu",
+    "checking": "Đang kiểm tra...",
+    "loading_to_last_watched": "Đang chuyển đến vị trí xem lần trước..."
   },
   "watchlist": {
     "added": "Đã thêm vào danh sách yêu thích!",
