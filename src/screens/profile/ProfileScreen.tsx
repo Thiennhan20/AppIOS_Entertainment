@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Image, Modal, TouchableWithoutFeedback, ScrollView } from 'react-native';
 import { useAuth } from '../../context/AuthContext';
 import { useTheme, THEME_COLORS } from '../../context/ThemeContext';
@@ -7,11 +7,26 @@ import { Ionicons } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
 import { LinearGradient } from 'expo-linear-gradient';
 import Constants from 'expo-constants';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+
 export default function ProfileScreen({ navigation }: any) {
   const { t } = useTranslation();
   const { user, logout } = useAuth();
   const { themeColor, setThemeColor } = useTheme();
   const insets = useSafeAreaInsets();
+  
+  const [appHash, setAppHash] = useState<string | null>(null);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const hash = await AsyncStorage.getItem('notified_hash');
+        if (hash) setAppHash(hash.substring(0, 7));
+      } catch (e) {
+        // ignore
+      }
+    })();
+  }, []);
 
   const [logoutModalVisible, setLogoutModalVisible] = useState(false);
 
@@ -131,7 +146,7 @@ export default function ProfileScreen({ navigation }: any) {
 
         <View style={{ alignItems: 'center', marginTop: 25, marginBottom: 5 }}>
           <Text style={{ color: '#666', fontSize: 13, fontFamily: 'monospace' }}>
-            App Version: {Constants.expoConfig?.version || '1.0.0'}
+            App Version (Hash): #{appHash || 'dev'}
           </Text>
         </View>
 
