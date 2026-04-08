@@ -1,23 +1,51 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { 
   StyleSheet, Text, View, TextInput, TouchableOpacity, 
-  KeyboardAvoidingView, Platform, Animated, Easing, ActivityIndicator 
+  KeyboardAvoidingView, Platform, Animated, Easing, ActivityIndicator, Image
 } from 'react-native';
+import * as ImagePicker from 'expo-image-picker';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '../../context/AuthContext';
 import { useTheme } from '../../context/ThemeContext';
+import CustomAlert from '../../components/CustomAlert';
 
 export default function SettingsScreen({ navigation }: any) {
   const { t } = useTranslation();
   const insets = useSafeAreaInsets();
-  const { user } = useAuth();
+  const { user, updateProfile } = useAuth();
   const { themeColor } = useTheme();
 
   const [name, setName] = useState(user?.name || '');
   const [email, setEmail] = useState(user?.email || '');
   const [saving, setSaving] = useState(false);
+  const [avatarBase64, setAvatarBase64] = useState<string | null>(null);
+
+  const [alertConfig, setAlertConfig] = useState({
+    visible: false,
+    title: '',
+    message: '',
+    isError: false,
+    iconName: undefined as any,
+    onClose: () => {}
+  });
+
+  const currentAvatarUrl = avatarBase64 ? `data:image/jpeg;base64,${avatarBase64}` : (user?.avatar || null);
+
+  const showAlert = (title: string, message: string, isError = false, onSuccess?: () => void) => {
+    setAlertConfig({
+      visible: true,
+      title,
+      message,
+      isError,
+      iconName: isError ? 'alert-circle' : 'checkmark-circle',
+      onClose: () => {
+        setAlertConfig(prev => ({ ...prev, visible: false }));
+        if (onSuccess) onSuccess();
+      }
+    });
+  };
 
   // Animations
   const fadeAnim = useRef(new Animated.Value(0)).current;
@@ -40,14 +68,64 @@ export default function SettingsScreen({ navigation }: any) {
     ]).start();
   }, []);
 
-  const handleSave = () => {
+  const handleSave = async () => {
+    if (!name.trim()) {
+      showAlert(t('general.error') || 'Error', t('profile.enter_name') || 'Please enter username', true);
+      return;
+    }
+
     setSaving(true);
-    // Simulate API Call
-    setTimeout(() => {
-      setSaving(false);
-      alert(t('profile.account_updated'));
-      navigation.goBack();
-    }, 1500);
+    
+    const data: any = { name };
+    if (avatarBase64) {
+      data.avatar = `data:image/jpeg;base64,${avatarBase64}`;
+    }
+
+    const res = await updateProfile(data);
+    setSaving(false);
+
+    if (res.success) {
+      showAlert(
+        t('general.success') || 'Success', 
+        t('profile.account_updated') || 'Profile updated successfully!', 
+        false, 
+        () => navigation.goBack()
+      );
+    } else {
+      showAlert(t('general.error') || 'Error', res.error || 'Failed to update profile!', true);
+    }
+  };
+
+  const handleChangeAvatar = async () => {
+    try {
+      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (status !== 'granted') {
+        showAlert(
+          t('general.error') || 'Error', 
+          t('profile.permission_needed') || 'Sorry, we need camera roll permissions to make this work!', 
+          true
+        );
+        return;
+      }
+
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ['images'],
+        allowsEditing: true,
+        aspect: [1, 1],
+        quality: 0.7,
+        base64: true,
+      });
+
+      if (!result.canceled && result.assets && result.assets.length > 0) {
+        const base64Str = result.assets[0].base64;
+        if (base64Str) {
+          setAvatarBase64(base64Str);
+        }
+      }
+    } catch (error) {
+      console.log('Error choosing avatar', error);
+      showAlert(t('general.error') || 'Error', t('profile.error_choosing_image') || 'Error choosing image', true);
+    }
   };
 
   return (
@@ -69,17 +147,27 @@ export default function SettingsScreen({ navigation }: any) {
         keyboardShouldPersistTaps="handled"
       >
         <View style={styles.avatarWrap}>
-          <View style={[styles.avatarPlaceholder, { borderColor: themeColor, backgroundColor: `${themeColor}22` }]}>
-            <Text style={[styles.avatarInitials, { color: themeColor }]}>
-              {name.charAt(0)?.toUpperCase() || 'U'}
-            </Text>
-          </View>
-          <TouchableOpacity style={[styles.editBadge, { backgroundColor: themeColor }]}>
+          {currentAvatarUrl ? (
+            <Image 
+              source={{ uri: currentAvatarUrl }} 
+              style={[styles.avatarImage, { borderColor: themeColor }]} 
+            />
+          ) : (
+            <View style={[styles.avatarPlaceholder, { borderColor: themeColor, backgroundColor: `${themeColor}22` }]}>
+              <Text style={[styles.avatarInitials, { color: themeColor }]}>
+                {name.charAt(0)?.toUpperCase() || 'U'}
+              </Text>
+            </View>
+          )}
+          <TouchableOpacity 
+            style={[styles.editBadge, { backgroundColor: themeColor }]}
+            onPress={handleChangeAvatar}
+          >
             <Ionicons name="camera" size={14} color="#fff" />
           </TouchableOpacity>
         </View>
 
-        <Text style={styles.label}>Username</Text>
+        <Text style={styles.label}>{t('profile.username_label') || 'Username'}</Text>
         <TextInput 
           style={[styles.input, { borderColor: 'rgba(255,255,255,0.1)' }]} 
           value={name}
@@ -88,7 +176,7 @@ export default function SettingsScreen({ navigation }: any) {
           placeholderTextColor="#666"
         />
 
-        <Text style={styles.label}>Email (Account Google)</Text>
+        <Text style={styles.label}>{t('profile.email_google_label') || 'Email (Account Google)'}</Text>
         <TextInput 
           style={[styles.input, styles.disabledInput]} 
           value={email}
@@ -113,6 +201,14 @@ export default function SettingsScreen({ navigation }: any) {
         </TouchableOpacity>
       </View>
 
+      <CustomAlert
+        visible={alertConfig.visible}
+        title={alertConfig.title}
+        message={alertConfig.message}
+        onClose={alertConfig.onClose}
+        isError={alertConfig.isError}
+        iconName={alertConfig.iconName}
+      />
     </KeyboardAvoidingView>
   );
 }
@@ -147,6 +243,12 @@ const styles = StyleSheet.create({
     borderRadius: 45,
     justifyContent: 'center',
     alignItems: 'center',
+    borderWidth: 2,
+  },
+  avatarImage: {
+    width: 90,
+    height: 90,
+    borderRadius: 45,
     borderWidth: 2,
   },
   avatarInitials: {

@@ -132,7 +132,11 @@
     "email_linked": "Linked email cannot be changed.",
     "save_changes": "Save changes",
     "no_movies_here": "No movies here yet",
-    "view_only_notice": "Currently, you can only view data here and cannot click directly to view movie details."
+    "view_only_notice": "Currently, you can only view data here and cannot click directly to view movie details.",
+    "permission_needed": "Sorry, we need camera roll permissions to make this work!",
+    "username_label": "Username",
+    "email_google_label": "Email (Account Google)",
+    "error_choosing_image": "Error choosing image"
   },
   "search": {
     "search_movies_series": "Search movies, series...",

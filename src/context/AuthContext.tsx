@@ -88,8 +88,21 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     setUser(null);
   };
 
+  const updateProfileContext = async (data: any) => {
+    try {
+      const response = await authApi.updateProfile(data);
+      if (response.user) {
+        setUser(response.user);
+      }
+      return { success: true };
+    } catch (err: any) {
+      const msg = err.response?.data?.message || 'Update profile error';
+      return { success: false, error: msg };
+    }
+  };
+
   return (
-    <AuthContext.Provider value={{ user, loading, login, register, logout, googleLogin, registerSearchHistoryFlush }}>
+    <AuthContext.Provider value={{ user, loading, login, register, logout, googleLogin, registerSearchHistoryFlush, updateProfile: updateProfileContext }}>
       {children}
     </AuthContext.Provider>
   );

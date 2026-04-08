@@ -132,7 +132,11 @@
     "email_linked": "Email đã liên kết không thể thay đổi.",
     "save_changes": "Lưu thay đổi",
     "no_movies_here": "Chưa có phim nào ở đây",
-    "view_only_notice": "Hiện tại bạn chỉ có thể xem dữ liệu ở đây, không thể bấm thẳng để xem chi tiết phim được."
+    "view_only_notice": "Hiện tại bạn chỉ có thể xem dữ liệu ở đây, không thể bấm thẳng để xem chi tiết phim được.",
+    "permission_needed": "Rất tiếc, chúng tôi cần quyền truy cập thư viện ảnh để thực hiện chức năng này!",
+    "username_label": "Tên hiển thị",
+    "email_google_label": "Email (Tài khoản Google)",
+    "error_choosing_image": "Lỗi khi chọn ảnh"
   },
   "search": {
     "search_movies_series": "Tìm kiếm phim, series...",

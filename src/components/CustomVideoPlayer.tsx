@@ -43,6 +43,10 @@ export default function CustomVideoPlayer({
   const ZOOM_LEVELS = [0.9, 0.95, 1.0, 1.1, 1.15];
   const [zoomIndex, setZoomIndex] = useState(2);
 
+  const isSeekingRef = useRef(false);
+  const seekTargetRef = useRef(0);
+  const [isSeekingUi, setIsSeekingUi] = useState(false);
+
   // Resume popup state
   const [resumePopup, setResumePopup] = useState<{ show: boolean; savedTime: number }>({ show: false, savedTime: 0 });
   const [checkingResume, setCheckingResume] = useState(true);
@@ -216,13 +220,17 @@ export default function CustomVideoPlayer({
         const newTime = player.currentTime || 0;
 
         // Batch all player state into a single setState
-        setPlayerState({
-          currentTime: newTime,
-          duration: player.duration || 0,
-          isPlaying: player.playing,
-          playbackRate: player.playbackRate || 1,
-          isMuted: player.muted,
-          volume: player.volume ?? 1,
+        setPlayerState(prev => {
+          if (isSeekingRef.current) return prev; // Do not overwrite state while seeking
+
+          return {
+            currentTime: newTime,
+            duration: player.duration || 0,
+            isPlaying: player.playing,
+            playbackRate: player.playbackRate || 1,
+            isMuted: player.muted,
+            volume: player.volume ?? 1,
+          };
         });
 
         // Pause detection (integrated here to avoid a second interval)
@@ -319,26 +327,48 @@ export default function CustomVideoPlayer({
 
   const skipBackward = () => {
     if (player) {
-      player.currentTime = Math.max((player.currentTime || 0) - 10, 0);
+      const baseTime = isSeekingRef.current ? seekTargetRef.current : (player.currentTime || 0);
+      const target = Math.max(baseTime - 10, 0);
+      handleSeek(target);
     }
-    triggerSeekSave();
-    resetControlsTimeout();
   };
   
   const skipForward = () => {
     if (player) {
-      player.currentTime = Math.min((player.currentTime || 0) + 10, player.duration || 0);
+      const baseTime = isSeekingRef.current ? seekTargetRef.current : (player.currentTime || 0);
+      const target = Math.min(baseTime + 10, player.duration || 0);
+      handleSeek(target);
     }
-    triggerSeekSave();
-    resetControlsTimeout();
   };
 
   const handleSeek = (value: number) => {
+    isSeekingRef.current = true;
+    seekTargetRef.current = value;
+    setIsSeekingUi(true);
+    setPlayerState(p => ({ ...p, currentTime: value }));
+
     if (player) {
       player.currentTime = value;
     }
     triggerSeekSave();
     resetControlsTimeout();
+
+    let attempts = 0;
+    const pollId = setInterval(() => {
+      attempts++;
+      if (!player) {
+        clearInterval(pollId);
+        isSeekingRef.current = false;
+        setIsSeekingUi(false);
+        return;
+      }
+      const ct = player.currentTime || 0;
+      if (Math.abs(ct - value) < 1.5 || attempts > 15) {
+        clearInterval(pollId);
+        isSeekingRef.current = false;
+        setIsSeekingUi(false);
+      }
+    }, 200);
   };
 
   const toggleMute = () => {
@@ -576,8 +606,12 @@ export default function CustomVideoPlayer({
               <Ionicons name="play-back-outline" size={42} color="white" />
             </TouchableOpacity>
             
-            <TouchableOpacity onPress={togglePlay} style={[styles.controlBtn, { marginHorizontal: 45 }]}>
-              <Ionicons name={playerState.isPlaying ? "pause-circle-outline" : "play-circle-outline"} size={70} color="white" />
+            <TouchableOpacity onPress={togglePlay} style={[styles.controlBtn, { marginHorizontal: 45, width: 70, height: 70, justifyContent: 'center', alignItems: 'center' }]}>
+              {isSeekingUi ? (
+                <ActivityIndicator size="large" color="white" style={{ transform: [{ scale: 1.2 }] }} />
+              ) : (
+                <Ionicons name={playerState.isPlaying ? "pause-circle-outline" : "play-circle-outline"} size={70} color="white" style={{ position: 'absolute' }} />
+              )}
             </TouchableOpacity>
             
             <TouchableOpacity onPress={skipForward} style={styles.controlBtn}>
@@ -591,9 +625,18 @@ export default function CustomVideoPlayer({
               style={styles.slider}
               minimumValue={0}
               maximumValue={playerState.duration > 0 ? playerState.duration : 1}
-              value={playerState.currentTime}
+              value={isSeekingUi ? seekTargetRef.current : playerState.currentTime}
               tapToSeek={true}
-              onValueChange={() => { if(controlsTimeoutRef.current) clearTimeout(controlsTimeoutRef.current); }}
+              onSlidingStart={() => {
+                isSeekingRef.current = true;
+                setIsSeekingUi(true);
+                if(controlsTimeoutRef.current) clearTimeout(controlsTimeoutRef.current);
+              }}
+              onValueChange={(val) => { 
+                seekTargetRef.current = val;
+                setPlayerState(p => ({ ...p, currentTime: val }));
+                if(controlsTimeoutRef.current) clearTimeout(controlsTimeoutRef.current); 
+              }}
               onSlidingComplete={handleSeek}
               minimumTrackTintColor={themeColor}
               maximumTrackTintColor="rgba(255,255,255,0.3)"
