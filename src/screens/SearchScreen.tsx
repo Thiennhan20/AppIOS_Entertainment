@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, TextInput, StyleSheet, FlatList, TouchableOpacity, Image, ActivityIndicator, Vibration } from 'react-native';
+import { View, Text, TextInput, StyleSheet, FlatList, TouchableOpacity, ActivityIndicator, Vibration } from 'react-native';
+import { Image } from 'expo-image';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
@@ -114,7 +115,7 @@ export default function SearchScreen({ navigation }: any) {
           delayLongPress={400}
           activeOpacity={0.8}
         >
-          <Image source={{ uri: `https://image.tmdb.org/t/p/w200${item.poster_path}` }} style={styles.autoPoster} />
+          <Image source={{ uri: `https://image.tmdb.org/t/p/w200${item.poster_path}` }} style={styles.autoPoster} contentFit="cover" />
           <View style={styles.autoDetails}>
             <Text style={styles.autoTitle} numberOfLines={2}>{item.title || item.name}</Text>
             <View style={styles.autoMetaRow}>
@@ -146,6 +147,7 @@ export default function SearchScreen({ navigation }: any) {
         <Image 
           source={{ uri: `https://image.tmdb.org/t/p/w200${item.poster_path}` }} 
           style={styles.poster} 
+          contentFit="cover"
         />
         <Text style={styles.cardTitle} numberOfLines={1}>{item.title || item.name}</Text>
       </TouchableOpacity>
@@ -317,7 +319,6 @@ const styles = StyleSheet.create({
     width: '100%',
     aspectRatio: 2/3,
     borderRadius: 6,
-    resizeMode: 'cover',
   },
   cardTitle: {
     color: '#fff',
@@ -353,7 +354,6 @@ const styles = StyleSheet.create({
     width: 60,
     height: 90,
     borderRadius: 4,
-    resizeMode: 'cover',
   },
   autoDetails: {
     flex: 1,

@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, TextInput, TouchableOpacity, Image, ActivityIndicator, Alert } from 'react-native';
+import { View, Text, StyleSheet, TextInput, TouchableOpacity, ActivityIndicator, Alert } from 'react-native';
+import { Image } from 'expo-image';
 import { Ionicons } from '@expo/vector-icons';
 import { commentsApi } from '../api/commentsApi';
 import { useAuth } from '../context/AuthContext';
@@ -250,7 +251,7 @@ export default function Comments({ movieId, type, title }: CommentsProps) {
       <View style={styles.inputCard}>
         <View style={styles.inputRow}>
           {isAuthenticated && user?.avatar ? (
-            <Image source={{ uri: user.avatar }} style={styles.avatar} />
+            <Image source={{ uri: user.avatar }} style={styles.avatar} contentFit="cover" />
           ) : isAuthenticated ? (
             <View style={styles.avatarPlaceholder}>
               <Text style={styles.avatarInitial}>{user?.name?.charAt(0).toUpperCase() || 'U'}</Text>
@@ -314,7 +315,7 @@ export default function Comments({ movieId, type, title }: CommentsProps) {
             <View style={styles.commentHeader}>
               <View style={styles.commentUserRow}>
                 {comment.userId?.avatar ? (
-                  <Image source={{ uri: comment.userId.avatar }} style={styles.avatarSmall} />
+                  <Image source={{ uri: comment.userId.avatar }} style={styles.avatarSmall} contentFit="cover" />
                 ) : (
                   <View style={styles.avatarPlaceholderSmall}>
                     <Text style={styles.avatarInitialSmall}>{comment.userId?.name?.charAt(0).toUpperCase() || '?'}</Text>
@@ -412,7 +413,7 @@ export default function Comments({ movieId, type, title }: CommentsProps) {
               <View key={reply._id} style={styles.replyItem}>
                 <View style={styles.commentUserRow}>
                   {reply.userId?.avatar ? (
-                    <Image source={{ uri: reply.userId.avatar }} style={styles.avatarTiny} />
+                    <Image source={{ uri: reply.userId.avatar }} style={styles.avatarTiny} contentFit="cover" />
                   ) : (
                     <View style={styles.avatarPlaceholderTiny}>
                       <Text style={styles.avatarInitialTiny}>{reply.userId?.name?.charAt(0).toUpperCase() || '?'}</Text>

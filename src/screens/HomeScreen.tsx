@@ -1,13 +1,15 @@
 import { useTranslation } from 'react-i18next';
 import React, { useEffect, useState, useCallback, useMemo } from 'react';
 import { 
-  StyleSheet, Text, View, Image, ScrollView, FlatList,
+  StyleSheet, Text, View, ScrollView, FlatList,
   TouchableOpacity, Dimensions, ActivityIndicator,
   RefreshControl, Modal, TouchableWithoutFeedback, Animated, Vibration
 } from 'react-native';
+import { Image } from 'expo-image';
 import YoutubePlayer from 'react-native-youtube-iframe';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
+import MaskedView from '@react-native-masked-view/masked-view';
 import { useTheme } from '../context/ThemeContext';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
@@ -15,6 +17,7 @@ import { tmdbApi } from '../api/tmdb';
 import { authApi } from '../api/authApi';
 import { useToast } from '../context/ToastContext';
 import { commentsApi } from '../api/commentsApi';
+import { roomApi } from '../api/roomApi';
 import LongPressMoviePopup from '../components/LongPressMoviePopup';
 import WatchlistButton from '../components/WatchlistButton';
 import ScrollToTopButton from '../components/ScrollToTopButton';
@@ -264,6 +267,7 @@ export default function HomeScreen({ navigation }: any) {
 
   const [recentlyWatched, setRecentlyWatched] = useState<any[]>([]);
   const [watchlist, setWatchlist] = useState<any[]>([]);
+  const [activeRooms, setActiveRooms] = useState<any[]>([]);
   
   const [trendingMovies, setTrendingMovies] = useState<any[]>([]);
   const [trendingTV,     setTrendingTV]     = useState<any[]>([]);
@@ -357,15 +361,18 @@ export default function HomeScreen({ navigation }: any) {
 
   const fetchData = async () => {
     try {
-      const [movieData, tvData] = await Promise.all([
+      const [movieData, tvData, roomsData] = await Promise.all([
         tmdbApi.getTrendingMovies(),
         tmdbApi.getTrendingTV(),
+        roomApi.getActiveRooms().catch(() => ({ rooms: [] }))
       ]);
       const movies = (movieData as any)?.results || [];
       const tv = (tvData as any)?.results || [];
+      const rooms = (roomsData as any)?.rooms || [];
       
       setTrendingMovies(movies);
       setTrendingTV(tv);
+      setActiveRooms(rooms);
 
       if (movies.length >= 3 && tv.length >= 2) {
         setFeaturedList([
@@ -636,12 +643,23 @@ export default function HomeScreen({ navigation }: any) {
   const prevImageUri = prevFeatured?.poster_path
     ? `https://image.tmdb.org/t/p/w780${prevFeatured.poster_path}` : null;
 
+  const topCast = useMemo(() => [
+    { id: '1', name: 'Tom Cruise', image: 'https://image.tmdb.org/t/p/w200/gThaIXgpBVyBb2sM070Wj8Jm4G5.jpg' },
+    { id: '2', name: 'Scarlett Johansson', image: 'https://image.tmdb.org/t/p/w200/60Zrsx4U43z8GtyBpmKjK3nU8pM.jpg' },
+    { id: '3', name: 'Leonardo DiCaprio', image: 'https://image.tmdb.org/t/p/w200/wo2hJpn04vbtmh0B9utCFdsQhxM.jpg' },
+    { id: '4', name: 'Cillian Murphy', image: 'https://image.tmdb.org/t/p/w200/i8d63evB4h6x1Rmbk1k7oHmbDDB.jpg' },
+    { id: '5', name: 'Margot Robbie', image: 'https://image.tmdb.org/t/p/w200/euDPyqLnuwaWmHutvn5IiY2Kj1.jpg' }
+  ], []);
+
   const finalSections = useMemo(() => {
     const baseSections: any[] = [
       { id: 'featured', type: 'FEATURED' },
-      { id: 'trending_movies', label: t('home.trending_movies'), data: trendingMovies, type: 'MOVIE_ROW', isTV: false, isHistory: false, isWatchlist: false },
+      { id: 'watch_parties', label: '🔥 Phòng Đang Xem Chung', data: activeRooms, type: 'WATCH_PARTIES' },
+      { id: 'trending_movies', label: '🍿 Top 10 Thịnh Hành Hôm Nay', data: trendingMovies.slice(0, 10), type: 'TOP_10', isTV: false, isHistory: false, isWatchlist: false },
       { id: 'history', label: `▶️ ${t('home.continue_watching')}`, data: recentlyWatched, type: 'MOVIE_ROW', isTV: false, isHistory: true, isWatchlist: false },
-      { id: 'trending_tv', label: t('home.top_tv_shows'), data: trendingTV, type: 'MOVIE_ROW', isTV: true, isHistory: false, isWatchlist: false },
+      { id: 'top_cast', label: '⭐ Diễn Viên Được Yêu Thích', data: topCast, type: 'TOP_CAST' },
+      { id: 'ai_picks', label: '✨ AI Đề Xuất Riêng Cho Bạn', data: topRated.slice(0, 10), type: 'AI_PICKS', isTV: false },
+      { id: 'trending_tv', label: t('home.top_tv_shows'), data: trendingTV.slice(0, 10), type: 'MOVIE_ROW', isTV: true, isHistory: false, isWatchlist: false },
       { id: 'watchlist_row', label: t('home.your_watchlist'), data: watchlist, type: 'MOVIE_ROW', isTV: false, isHistory: false, isWatchlist: true },
       { id: 'top_comments', type: 'TOP_COMMENTS', data: topComments },
       { id: 'recent_comments', type: 'RECENT_COMMENTS', data: recentComments },
@@ -649,12 +667,11 @@ export default function HomeScreen({ navigation }: any) {
 
     if (phase2Loaded) {
       baseSections.push(
-        { id: 'upcoming', label: t('home.coming_soon'), data: upcoming, type: 'MOVIE_ROW', isTV: false, isHistory: false, isWatchlist: false },
-        { id: 'action', label: t('home.action_thriller'), data: actionMovies, type: 'MOVIE_ROW', isTV: false, isHistory: false, isWatchlist: false },
-        { id: 'anime', label: t('home.anime_animation'), data: anime, type: 'MOVIE_ROW', isTV: true, isHistory: false, isWatchlist: false },
-        { id: 'horror', label: t('home.horror_thrills'), data: horrorMovies, type: 'MOVIE_ROW', isTV: false, isHistory: false, isWatchlist: false },
-        { id: 'romance', label: t('home.sweet_romance'), data: romanceMovies, type: 'MOVIE_ROW', isTV: false, isHistory: false, isWatchlist: false },
-        { id: 'top_rated', label: t('home.top_rated'), data: topRated, type: 'MOVIE_ROW', isTV: false, isHistory: false, isWatchlist: false }
+        { id: 'upcoming', label: '⏳ Sắp Ra Mắt (Đặt Lịch Theo Dõi)', data: upcoming, type: 'COMING_SOON', isTV: false, isHistory: false, isWatchlist: false },
+        { id: 'action', label: '💥 Đẩy Cao Trào, Xả Stress Mới Phê', data: actionMovies, type: 'MOVIE_ROW', isTV: false, isHistory: false, isWatchlist: false },
+        { id: 'anime', label: '👺 Lặn Sâu Vào Thế Giới Wibu', data: anime, type: 'MOVIE_ROW', isTV: true, isHistory: false, isWatchlist: false },
+        { id: 'horror', label: '👻 Dành Riêng Cho Đêm Khuya Không Ngủ', data: horrorMovies, type: 'MOVIE_ROW', isTV: false, isHistory: false, isWatchlist: false },
+        { id: 'romance', label: '☔ Khóc Thêm Chút Nữa Mưa Rơi', data: romanceMovies, type: 'MOVIE_ROW', isTV: false, isHistory: false, isWatchlist: false }
       );
     }
 
@@ -754,6 +771,176 @@ export default function HomeScreen({ navigation }: any) {
             windowSize={3}
             removeClippedSubviews={true}
           />
+        </View>
+      );
+    }
+
+    if (section.type === 'TOP_10') {
+      return (
+        <View style={{ paddingBottom: 15, marginTop: 10 }}>
+          <Text style={[styles.sectionTitle, { fontSize: 20, marginBottom: 15 }]}>{section.label}</Text>
+          <FlatList
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.row}
+            data={section.data}
+            keyExtractor={(item, idx) => `top10-${item.id}-${idx}`}
+            initialNumToRender={4}
+            maxToRenderPerBatch={4}
+            windowSize={3}
+            removeClippedSubviews={true}
+            renderItem={({ item, index }) => (
+              <TouchableOpacity
+                style={{ marginRight: 20, position: 'relative', width: 140, height: 160, display: 'flex', flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'flex-end' }}
+                onPress={() => navigation.navigate('DetailScreen', { item, isTV: section.isTV })}
+                activeOpacity={0.8}
+              >
+                {/* Number Outline (Shadow Layer) */}
+                <Text style={{ position: 'absolute', bottom: -25, left: -5, fontSize: 130, fontWeight: '900', color: '#16161e', textShadowColor: '#111', textShadowOffset: {width: 3, height: 0}, textShadowRadius: 3, zIndex: 10, letterSpacing: -5 }}>
+                   {index + 1}
+                </Text>
+                
+                {/* Gradient Number inside MaskedView */}
+                <MaskedView
+                  style={{ position: 'absolute', bottom: -25, left: -5, zIndex: 11, height: 157, width: 90, flex: 1 }}
+                  maskElement={
+                    <Text style={{ fontSize: 130, fontWeight: '900', color: 'black', letterSpacing: -5, backgroundColor: 'transparent' }}>
+                      {index + 1}
+                    </Text>
+                  }
+                >
+                  <LinearGradient
+                    colors={(themeGradient as [string, string]) || [themeColor, '#ffffff']}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 1 }}
+                    style={{ flex: 1 }}
+                  />
+                </MaskedView>
+
+                {/* Poster */}
+                <Image source={{ uri: `https://image.tmdb.org/t/p/w200${item.poster_path}` }} style={{ width: 105, height: 150, borderRadius: 10, zIndex: 5 }} contentFit="cover" transition={200} cachePolicy="memory-disk" />
+              </TouchableOpacity>
+            )}
+          />
+        </View>
+      );
+    }
+
+    if (section.type === 'WATCH_PARTIES') {
+      return (
+        <View style={{ paddingBottom: 15 }}>
+          <Text style={styles.sectionTitle}>{section.label}</Text>
+          <FlatList
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.row}
+            data={section.data}
+            keyExtractor={(item) => `room-${item.room_id}`}
+            initialNumToRender={3}
+            maxToRenderPerBatch={3}
+            windowSize={3}
+            removeClippedSubviews={true}
+            renderItem={({ item }) => (
+              <TouchableOpacity 
+                style={{ width: 220, backgroundColor: 'rgba(255,255,255,0.05)', borderRadius: 12, padding: 12, marginRight: 15, borderWidth: 1, borderColor: `${themeColor}44` }}
+                onPress={() => {
+                  navigation.navigate('StreamingRoomScreen', {
+                    roomId: item.room_id,
+                    initialStreamUrl: '',
+                    initialTitle: item.title || 'Watch Party',
+                    isHost: false
+                  });
+                }}
+              >
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 8 }}>
+                   <Text style={{ color: 'white', fontWeight: 'bold', fontSize: 14, flex: 1 }} numberOfLines={1}>{item.title}</Text>
+                   <View style={{ backgroundColor: themeColor, paddingHorizontal: 6, borderRadius: 4, justifyContent: 'center' }}>
+                     <Text style={{ color: 'white', fontSize: 10, fontWeight: 'bold' }}>LIVE</Text>
+                   </View>
+                </View>
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                   <Text style={{ color: '#aaa', fontSize: 12 }}><Ionicons name="person-circle" /> {item.host_name}</Text>
+                   <Text style={{ color: '#aaa', fontSize: 12 }}><Ionicons name="people" /> {item.members?.length || 1}</Text>
+                </View>
+              </TouchableOpacity>
+            )}
+            ListEmptyComponent={<Text style={{ color: '#666', marginLeft: 18, fontStyle: 'italic' }}>Chưa có phòng nào đang mở. Hãy làm người đầu tiên!</Text>}
+          />
+        </View>
+      );
+    }
+
+    if (section.type === 'TOP_CAST') {
+      return (
+        <View style={{ paddingBottom: 15, marginTop: 10 }}>
+          <Text style={styles.sectionTitle}>{section.label}</Text>
+          <FlatList
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.row}
+            data={section.data}
+            keyExtractor={(item) => `cast-${item.id}`}
+            initialNumToRender={5}
+            maxToRenderPerBatch={5}
+            windowSize={3}
+            removeClippedSubviews={true}
+            renderItem={({ item }) => (
+              <TouchableOpacity style={{ alignItems: 'center', marginRight: 20 }} activeOpacity={0.8}>
+                 <Image source={{ uri: item.image }} style={{ width: 75, height: 75, borderRadius: 37.5, borderWidth: 2, borderColor: themeColor, marginBottom: 8 }} contentFit="cover" transition={200} cachePolicy="memory-disk" />
+                 <Text style={{ color: '#ccc', fontSize: 12, fontWeight: 'bold', width: 80, textAlign: 'center' }} numberOfLines={2}>{item.name}</Text>
+              </TouchableOpacity>
+            )}
+          />
+        </View>
+      );
+    }
+
+    if (section.type === 'COMING_SOON') {
+      return (
+        <View style={{ paddingBottom: 15 }}>
+          <Text style={styles.sectionTitle}>{section.label}</Text>
+          <FlatList
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.row}
+            data={section.data}
+            keyExtractor={(item, idx) => `coming-${item.id}-${idx}`}
+            initialNumToRender={3}
+            maxToRenderPerBatch={3}
+            windowSize={3}
+            removeClippedSubviews={true}
+            renderItem={({ item }) => (
+              <TouchableOpacity style={{ marginRight: 15, width: 220, position: 'relative' }} onPress={() => navigation.navigate('DetailScreen', { item, isTV: false })}>
+                 <Image source={{ uri: `https://image.tmdb.org/t/p/w400${item.backdrop_path || item.poster_path}` }} style={{ width: 220, height: 120, borderRadius: 10 }} contentFit="cover" transition={200} cachePolicy="memory-disk" />
+                 <View style={{ position: 'absolute', bottom: 0, width: '100%', padding: 10, backgroundColor: 'rgba(0,0,0,0.6)', borderBottomLeftRadius: 10, borderBottomRightRadius: 10, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <Text style={{ color: 'white', fontWeight: 'bold', flex: 1, marginRight: 10 }} numberOfLines={1}>{item.title}</Text>
+                    <Ionicons name="notifications" color="white" size={16} />
+                 </View>
+              </TouchableOpacity>
+            )}
+          />
+        </View>
+      );
+    }
+
+    if (section.type === 'AI_PICKS') {
+      return (
+        <View style={{ paddingBottom: 15 }}>
+          <Text style={[styles.sectionTitle, { color: '#00E5FF' }]}>{section.label}</Text>
+          <View style={{ backgroundColor: 'rgba(0, 229, 255, 0.05)', borderWidth: 1, borderColor: 'rgba(0, 229, 255, 0.2)', paddingVertical: 15, marginHorizontal: 10, borderRadius: 15 }}>
+            <FlatList
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.row}
+              data={section.data}
+              keyExtractor={(item, idx) => `ai-${item.id}-${idx}`}
+              initialNumToRender={4}
+              maxToRenderPerBatch={4}
+              windowSize={3}
+              removeClippedSubviews={true}
+              renderItem={({ item, index }) => renderMovieCard(item, section.isTV, false, false, index)}
+            />
+          </View>
         </View>
       );
     }
@@ -1042,7 +1229,7 @@ const styles = StyleSheet.create({
 
   // Featured
   featuredContainer: { height: height * 0.7, width: '100%' },
-  featuredImage:     { width: '100%', height: '100%', resizeMode: 'cover' },
+  featuredImage:     { width: '100%', height: '100%' },
   gradient:          { position: 'absolute', left: 0, right: 0, bottom: 0, height: 300 },
   featuredContent:   { position: 'absolute', bottom: 0, width: '100%', alignItems: 'center', paddingBottom: 55 },
   featuredCategory:  { color: 'white', fontSize: 13, fontWeight: '600', marginBottom: 18, textShadowColor: 'black', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3 },
@@ -1074,7 +1261,6 @@ const styles = StyleSheet.create({
   thumbnailDotImage: {
     width: '100%',
     height: '100%',
-    resizeMode: 'cover',
   },
 
   // Lists
@@ -1082,7 +1268,7 @@ const styles = StyleSheet.create({
   sectionTitle:  { color: 'white', fontSize: 17, fontWeight: '700', marginLeft: 18, marginTop: 22, marginBottom: 10 },
   row:           { paddingHorizontal: 18 },
   movieCard:     { marginRight: 12 },
-  moviePoster:   { width: 108, height: 158, borderRadius: 9, resizeMode: 'cover' },
+  moviePoster:   { width: 108, height: 158, borderRadius: 9 },
   placeholderCard: { backgroundColor: '#222230', justifyContent: 'center', alignItems: 'center', padding: 10 },
   
   // Custom History Card
@@ -1097,7 +1283,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.05)',
   },
-  historyPoster: { width: 75, height: '100%', resizeMode: 'cover' },
+  historyPoster: { width: 75, height: '100%' },
   historyInfo: { flex: 1, padding: 10, justifyContent: 'space-between', position: 'relative' },
   historyTitle: { color: 'white', fontSize: 13, fontWeight: '700' },
   historyBadgeRow: { flexDirection: 'row', alignItems: 'center', marginTop: -2 },

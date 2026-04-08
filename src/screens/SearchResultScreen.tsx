@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, FlatList, TouchableOpacity, Image, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, FlatList, TouchableOpacity, ActivityIndicator } from 'react-native';
+import { Image } from 'expo-image';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
@@ -121,6 +122,7 @@ export default function SearchResultScreen({ route, navigation }: any) {
         <Image 
           source={{ uri: `https://image.tmdb.org/t/p/w200${item.poster_path}` }} 
           style={styles.poster} 
+          contentFit="cover"
         />
         <Text style={styles.cardTitle} numberOfLines={1}>{item.title || item.name}</Text>
       </TouchableOpacity>
@@ -257,7 +259,6 @@ const styles = StyleSheet.create({
     width: '100%',
     aspectRatio: 2/3,
     borderRadius: 6,
-    resizeMode: 'cover',
   },
   cardTitle: {
     color: '#fff',

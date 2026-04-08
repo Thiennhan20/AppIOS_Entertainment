@@ -39,12 +39,13 @@ import { ThemeProvider, useTheme } from './src/context/ThemeContext';
 import { ToastProvider } from './src/context/ToastContext';
 
 import CustomSplashScreen from './src/screens/SplashScreen';
-import HomeScreen from './src/screens/HomeScreen';
+import HomeScreen from './src/screens/home_screen';
 import DetailScreen from './src/screens/detail/DetailScreen';
 import SearchScreen from './src/screens/SearchScreen';
 import SearchResultScreen from './src/screens/SearchResultScreen';
 import ListScreen from './src/screens/ListScreen';
 import PlayerScreen from './src/screens/video_player/PlayerScreen';
+import StreamingRoomScreen from './src/screens/video_player/StreamingRoomScreen';
 import GameScreen from './src/screens/GameScreen';
 import AIScreen from './src/screens/AIScreen';
 import ProfileScreen from './src/screens/profile/ProfileScreen';
@@ -79,6 +80,7 @@ function HomeStack() {
       <Stack.Screen name="ListScreen" component={ListScreen} />
       <Stack.Screen name="DetailScreen" component={DetailScreen} />
       <Stack.Screen name="PlayerScreen" component={PlayerScreen} />
+      <Stack.Screen name="StreamingRoomScreen" component={StreamingRoomScreen} />
     </Stack.Navigator>
   );
 }
@@ -116,6 +118,22 @@ function ProfileStack() {
       <Stack.Screen name="ListScreen" component={ListScreen} />
       <Stack.Screen name="DetailScreen" component={DetailScreen} />
       <Stack.Screen name="PlayerScreen" component={PlayerScreen} />
+      <Stack.Screen name="StreamingRoomScreen" component={StreamingRoomScreen} />
+    </Stack.Navigator>
+  );
+}
+
+function StreamingStack() {
+  return (
+    <Stack.Navigator 
+      screenOptions={{ 
+        headerShown: false,
+        animation: 'slide_from_right',
+        gestureEnabled: true,
+      }}
+    >
+      <Stack.Screen name="StreamingScreen" component={StreamingScreen} />
+      <Stack.Screen name="StreamingRoomScreen" component={StreamingRoomScreen} />
     </Stack.Navigator>
   );
 }
@@ -130,7 +148,7 @@ function MainTabs() {
       }}
     >
       <Tab.Screen name="HomeStack" component={HomeStack} options={{ tabBarLabel: t('general.home') }} />
-      <Tab.Screen name="Streaming" component={StreamingScreen} options={{ tabBarLabel: 'Streaming' }} />
+      <Tab.Screen name="StreamingStack" component={StreamingStack} options={{ tabBarLabel: 'Streaming' }} />
       <Tab.Screen name="Game" component={GameScreen} options={{ tabBarLabel: t('general.entertainment') }} />
       <Tab.Screen name="AI" component={AIScreen} options={{ tabBarLabel: t('general.ai_hub') }} />
       <Tab.Screen name="Profile" component={ProfileStack} options={{ tabBarLabel: t('general.profile') }} />

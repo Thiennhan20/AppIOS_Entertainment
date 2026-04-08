@@ -97,7 +97,7 @@ export function AnimatedTabBar({ state, descriptors, navigation }: any) {
         // Icon resolution
         let iconName: any = 'home';
         if (route.name === 'HomeStack') iconName = isFocused ? 'home' : 'home-outline';
-        else if (route.name === 'Streaming') iconName = isFocused ? 'videocam' : 'videocam-outline';
+        else if (route.name === 'StreamingStack') iconName = isFocused ? 'videocam' : 'videocam-outline';
         else if (route.name === 'Game') iconName = isFocused ? 'game-controller' : 'game-controller-outline';
         else if (route.name === 'AI') iconName = isFocused ? 'sparkles' : 'sparkles-outline';
         else if (route.name === 'Profile') iconName = isFocused ? 'person' : 'person-outline';

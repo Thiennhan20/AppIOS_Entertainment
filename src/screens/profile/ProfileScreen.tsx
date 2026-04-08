@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Image, Modal, TouchableWithoutFeedback, ScrollView } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Modal, TouchableWithoutFeedback, ScrollView } from 'react-native';
+import { Image } from 'expo-image';
 import { useAuth } from '../../context/AuthContext';
 import { useTheme, THEME_COLORS } from '../../context/ThemeContext';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -48,7 +49,7 @@ export default function ProfileScreen({ navigation }: any) {
 
       <View style={[styles.profileSection, { borderBottomColor: themeColor }]}>
         {user?.avatar ? (
-          <Image source={{ uri: user.avatar }} style={[styles.avatar, { borderColor: themeColor }]} />
+          <Image source={{ uri: user.avatar }} style={[styles.avatar, { borderColor: themeColor }]} contentFit="cover" />
         ) : (
           <View style={[styles.avatarPlaceholder, { borderColor: themeColor }]}>
             <Text style={styles.avatarInitials}>

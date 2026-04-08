@@ -19,6 +19,7 @@ import { authApi } from '../../api/authApi';
 import CustomAlert from '../../components/CustomAlert';
 import CustomVideoPlayer from '../../components/CustomVideoPlayer';
 import Comments from '../../components/Comments';
+import { roomApi } from '../../api/roomApi';
 
 const { width, height } = Dimensions.get('window');
 
@@ -156,8 +157,30 @@ export default function PlayerScreenMovie({ route, navigation }: any) {
   const [activePlayerState, setActivePlayerState] = useState(activePlayer);
   const [titleState, setTitleState] = useState(routeTitle || item?.title || item?.name || 'Unknown Title');
   const [loadingStream, setLoadingStream] = useState(false);
+  const [creatingRoom, setCreatingRoom] = useState(false);
 
-
+  const handleCreateWatchParty = async () => {
+    if (!streamUrlState) {
+      showAlert(t('common.error', { defaultValue: 'Error' }), "No stream URL available.", true);
+      return;
+    }
+    setCreatingRoom(true);
+    try {
+       const res = await roomApi.createRoom(`${titleState} ${isTV ? `(S${selectedSeason} E${selectedEpisode})` : ''}`, streamUrlState);
+       if (res && res.room_id) {
+           navigation.navigate('StreamingRoomScreen', {
+              roomId: res.room_id,
+              initialStreamUrl: streamUrlState,
+              initialTitle: `${titleState} ${isTV ? `(S${selectedSeason} E${selectedEpisode})` : ''}`,
+              isHost: true
+           });
+       }
+    } catch (e: any) {
+       showAlert(t('common.error', { defaultValue: 'Error' }), e?.response?.data?.error || 'Unable to create room.', true);
+    } finally {
+       setCreatingRoom(false);
+    }
+  };
 
   const [selectedSeason, setSelectedSeason] = useState(1);
   const [selectedEpisode, setSelectedEpisode] = useState(1);
@@ -348,13 +371,32 @@ export default function PlayerScreenMovie({ route, navigation }: any) {
               )}
             </View>
 
-            <View style={styles.controlsRow}>
+            <View style={{ flexDirection: 'row', gap: 10, paddingHorizontal: 15, paddingBottom: 10 }}>
+              {selectedServer !== 'Server 3' && (
+                <TouchableOpacity 
+                  style={[styles.toggleCommentBtn, { flex: 1, backgroundColor: `${themeColor}22` }]} 
+                  onPress={handleCreateWatchParty}
+                  disabled={creatingRoom || !streamUrlState}
+                >
+                  {creatingRoom ? (
+                    <ActivityIndicator size="small" color={themeColor} />
+                  ) : (
+                    <>
+                      <Ionicons name="people-outline" size={20} color={themeColor} />
+                      <Text style={[styles.toggleCommentText, { color: themeColor, fontSize: 14 }]}>
+                        {t('watch_party.create', { defaultValue: 'Watch Together' })}
+                      </Text>
+                    </>
+                  )}
+                </TouchableOpacity>
+              )}
+              
               <TouchableOpacity 
-                style={styles.toggleCommentBtn} 
+                style={[styles.toggleCommentBtn, { flex: 1 }]} 
                 onPress={() => setCommentsVisible(!commentsVisible)}
               >
                 <Ionicons name={commentsVisible ? 'chatbubble-outline' : 'chatbubbles'} size={20} color="white" />
-                <Text style={styles.toggleCommentText}>
+                <Text style={[styles.toggleCommentText, { fontSize: 13 }]}>
                   {commentsVisible ? t('player.close_comments', { defaultValue: 'Close Comments' }) : t('player.open_comments', { defaultValue: 'Open Comments' })}
                 </Text>
                 <Ionicons name={commentsVisible ? "chevron-up" : "chevron-down"} size={16} color="gray" style={{marginLeft: 8}} />

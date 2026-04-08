@@ -1,9 +1,10 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { 
-  StyleSheet, Text, View, Image, ScrollView, FlatList,
+  StyleSheet, Text, View, ScrollView, FlatList,
   TouchableOpacity, Dimensions, ActivityIndicator, Modal, Alert
 } from 'react-native';
 import YoutubePlayer from 'react-native-youtube-iframe';
+import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
@@ -115,7 +116,11 @@ export default function DetailScreenMovie({ route, navigation }: any) {
 
   const title = details?.title || details?.name || item?.title || item?.name;
   const overview = details?.overview || item?.overview;
-  const year = details?.release_date?.substring(0,4) || details?.first_air_date?.substring(0,4) || item?.release_date?.substring(0,4) || '2023';
+  const releaseDateRaw = details?.release_date || details?.first_air_date || item?.release_date;
+  const year = releaseDateRaw?.substring(0,4) || '2023';
+  const formattedDate = releaseDateRaw ? releaseDateRaw.split('-').reverse().join('/') : year;
+  const rating = details?.vote_average ? `${details.vote_average.toFixed(1)}/10` : null;
+  const country = details?.production_countries?.[0]?.name || details?.production_countries?.[0]?.iso_3166_1 || '';
   const director = details?.credits?.crew?.find((c:any) => c.job === 'Director')?.name || '';
 
   // Check available streams in background to populate Audio Picker options
@@ -256,9 +261,8 @@ export default function DetailScreenMovie({ route, navigation }: any) {
         onScroll={handleScroll}
         scrollEventThrottle={16}
       >
-        {/* Backdrop */}
         <View style={styles.backdropContainer}>
-          <Image source={{ uri: featuredImageUri }} style={styles.backdropImage} />
+          <Image source={{ uri: featuredImageUri }} style={styles.backdropImage} contentFit="cover" />
           <LinearGradient colors={['transparent', '#0f0f13']} style={styles.gradient} />
           <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
             <Ionicons name="arrow-back" size={28} color="white" />
@@ -270,8 +274,9 @@ export default function DetailScreenMovie({ route, navigation }: any) {
           <Text style={styles.title}>{title}</Text>
           
           <View style={styles.metaRow}>
-            <Text style={styles.matchText}>98% {t('general.match', { defaultValue: 'Match' })}</Text>
-            <Text style={styles.metaText}>{year}</Text>
+            {rating ? <Text style={[styles.matchText, { color: '#FFD700' }]}>⭐ {rating}</Text> : <Text style={styles.matchText}>98% {t('general.match', { defaultValue: 'Match' })}</Text>}
+            <Text style={styles.metaText}>{formattedDate}</Text>
+            {country ? <Text style={styles.metaText}>{country}</Text> : null}
             <Text style={styles.ageRating}>16+</Text>
             <Text style={styles.metaText}>{details?.runtime ? `${details.runtime}m` : `1 ${t('general.season', { defaultValue: 'Season' })}`}</Text>
           </View>
@@ -397,6 +402,7 @@ export default function DetailScreenMovie({ route, navigation }: any) {
                     <Image 
                       source={{ uri: item.profile_path ? `https://image.tmdb.org/t/p/w200${item.profile_path}` : 'https://via.placeholder.com/200x300?text=NTN' }} 
                       style={styles.castImage} 
+                      contentFit="cover"
                     />
                     <Text style={styles.castName} numberOfLines={1}>{item.name}</Text>
                     <Text style={styles.castRole} numberOfLines={1}>{item.character}</Text>
@@ -428,6 +434,7 @@ export default function DetailScreenMovie({ route, navigation }: any) {
                     <Image 
                       source={{ uri: `https://image.tmdb.org/t/p/w200${item.poster_path}` }} 
                       style={styles.similarPoster} 
+                      contentFit="cover"
                     />
                   </TouchableOpacity>
                 )}
@@ -554,7 +561,6 @@ const styles = StyleSheet.create({
   backdropImage: {
     width: '100%',
     height: '100%',
-    resizeMode: 'cover',
   },
   gradient: {
     position: 'absolute',
@@ -778,7 +784,6 @@ const styles = StyleSheet.create({
     height: 80,
     borderRadius: 40,
     marginBottom: 8,
-    resizeMode: 'cover',
     borderWidth: 1,
     borderColor: '#333',
   },
@@ -802,6 +807,5 @@ const styles = StyleSheet.create({
     width: 120,
     height: 180,
     borderRadius: 8,
-    resizeMode: 'cover',
   }
 });

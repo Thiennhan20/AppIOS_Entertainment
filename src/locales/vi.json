@@ -249,7 +249,18 @@
     "signinRequired": "Cần Đăng Nhập",
     "signinDesc": "Bạn cần phải đăng nhập để tham gia",
     "backToLobby": "Về Sảnh Xem",
-    "hostedBy": "Host bởi"
+    "hostedBy": "Host bởi",
+    "watchParty": "Xem chung (Watch Party)",
+    "watchPartyDesc": "Cùng xem phim và trò chuyện cực mượt.",
+    "joinExisting": "Tham gia phòng đã có",
+    "enterRoomId": "Nhập mã phòng",
+    "activeRooms": "Các phòng đang hoạt động",
+    "loading": "Đang tải...",
+    "noActiveRooms": "Hiện không có phòng nào đang phát.",
+    "untitledRoom": "Phòng không tên",
+    "host": "Chủ phòng",
+    "howToCreateRoom": "Cách tạo phòng xem chung?",
+    "createRoomGuide": "Để tạo phòng, bạn vui lòng mở một bộ phim bạn muốn xem, bấm Phát phim (Play), sau đó nhấn vào nút 'Xem chung / Tạo phòng' bên dưới trình phát video. Mã mời được hiển thị ở góc trên cùng khu vực chat để gửi cho bạn bè."
   },
   "filter": {
     "action": "Hành động",

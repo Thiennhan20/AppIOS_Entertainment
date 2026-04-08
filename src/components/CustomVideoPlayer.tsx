@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, forwardRef, useImperativeHandle } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Animated, AppState, AppStateStatus, ActivityIndicator } from 'react-native';
 import { useVideoPlayer, VideoView } from 'expo-video';
 import { Ionicons } from '@expo/vector-icons';
@@ -21,12 +21,32 @@ interface CustomVideoPlayerProps {
   episode?: number;
   title?: string;
   poster?: string;
+  
+  // Watch Party callbacks
+  onLocalPlay?: (time: number) => void;
+  onLocalPause?: (time: number) => void;
+  onLocalSeek?: (time: number) => void;
+  onLocalSyncPosition?: (time: number) => void;
+  onLocalBuffering?: () => void;
+  onLocalBufferEnd?: (time: number) => void;
+  
+  // Watch Party flags
+  isWatchPartyViewOnly?: boolean; // For viewers when sync is locked
+  watchPartyWaitingReason?: string | null;
 }
 
-export default function CustomVideoPlayer({
+export interface CustomVideoPlayerRef {
+  remotePlay: (time: number) => void;
+  remotePause: (time: number) => void;
+  remoteSeek: (time: number) => void;
+}
+
+const CustomVideoPlayer = forwardRef<CustomVideoPlayerRef, CustomVideoPlayerProps>(({
   url, isFullscreen, onToggleFullscreen, themeColor,
-  movieId, server, audio, isTVShow, season, episode, title, poster
-}: CustomVideoPlayerProps) {
+  movieId, server, audio, isTVShow, season, episode, title, poster,
+  onLocalPlay, onLocalPause, onLocalSeek, onLocalSyncPosition,
+  onLocalBuffering, onLocalBufferEnd, isWatchPartyViewOnly, watchPartyWaitingReason
+}, ref) => {
   const { t } = useTranslation();
   const [showControls, setShowControls] = useState(true);
   const [playerState, setPlayerState] = useState({
@@ -232,20 +252,29 @@ export default function CustomVideoPlayer({
              if (!isBufferingRef.current) {
                isBufferingRef.current = true;
                setIsBufferingUi(true);
+               if (onLocalBuffering) onLocalBuffering();
              }
           } else {
              if (isBufferingRef.current) {
                isBufferingRef.current = false;
                setIsBufferingUi(false);
+               if (onLocalBufferEnd) onLocalBufferEnd(newTime);
              }
           }
         } else if (!player.playing || isSeekingRef.current) {
            if (isBufferingRef.current) {
              isBufferingRef.current = false;
              setIsBufferingUi(false);
+             if (onLocalBufferEnd) onLocalBufferEnd(newTime);
            }
         }
         lastPolledTimeRef.current = newTime;
+
+        // Periodic sync for host
+        if (player.playing && Math.round(newTime) % 5 === 0 && onLocalSyncPosition) {
+           // Not strictly accurate every 5s, but parent handles throttling
+           onLocalSyncPosition(newTime);
+        }
 
         // Batch all player state into a single setState
         setPlayerState(prev => {
@@ -347,13 +376,40 @@ export default function CustomVideoPlayer({
     }, 500);
   };
 
+  useImperativeHandle(ref, () => ({
+    remotePlay: (time: number) => {
+      if (player) {
+        player.currentTime = time;
+        player.play();
+      }
+    },
+    remotePause: (time: number) => {
+      if (player) {
+        player.currentTime = time;
+        player.pause();
+      }
+    },
+    remoteSeek: (time: number) => {
+      if (player) {
+        player.currentTime = time;
+      }
+    }
+  }));
+
   const togglePlay = () => {
-    if (playerState.isPlaying) player.pause();
-    else player.play();
+    if (isWatchPartyViewOnly) return; 
+    if (playerState.isPlaying) {
+      player.pause();
+      if (onLocalPause) onLocalPause(player.currentTime || 0);
+    } else {
+      player.play();
+      if (onLocalPlay) onLocalPlay(player.currentTime || 0);
+    }
     resetControlsTimeout();
   };
 
   const skipBackward = () => {
+    if (isWatchPartyViewOnly) return;
     if (player) {
       const baseTime = isSeekingRef.current ? seekTargetRef.current : (player.currentTime || 0);
       const target = Math.max(baseTime - 10, 0);
@@ -362,6 +418,7 @@ export default function CustomVideoPlayer({
   };
   
   const skipForward = () => {
+    if (isWatchPartyViewOnly) return;
     if (player) {
       const baseTime = isSeekingRef.current ? seekTargetRef.current : (player.currentTime || 0);
       const target = Math.min(baseTime + 10, player.duration || 0);
@@ -370,6 +427,7 @@ export default function CustomVideoPlayer({
   };
 
   const handleSeek = (value: number) => {
+    if (isWatchPartyViewOnly) return;
     isSeekingRef.current = true;
     seekTargetRef.current = value;
     setIsSeekingUi(true);
@@ -379,6 +437,7 @@ export default function CustomVideoPlayer({
       player.currentTime = value;
     }
     triggerSeekSave();
+    if (onLocalSeek) onLocalSeek(value);
     resetControlsTimeout();
 
     let attempts = 0;
@@ -428,6 +487,7 @@ export default function CustomVideoPlayer({
   };
 
   const handleTouchStart = (e: any) => {
+    if (isWatchPartyViewOnly) return;
     if (e.nativeEvent.touches.length === 2 && isFullscreen) {
       initialPinchDistRef.current = getDistance(e.nativeEvent.touches);
       hasPinchedRef.current = true;
@@ -500,6 +560,17 @@ export default function CustomVideoPlayer({
               contentFit="contain"
             />
           </Animated.View>
+          
+          {watchPartyWaitingReason && (
+            <View style={[StyleSheet.absoluteFillObject, { backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center', zIndex: 40 }]}>
+               <ActivityIndicator size="large" color={themeColor} style={{ marginBottom: 10 }} />
+               <Text style={{ color: 'white', fontWeight: '500' }}>
+                 {watchPartyWaitingReason === 'host_paused' ? t('watch_party.host_paused', { defaultValue: 'Host paused — waiting...' })
+                  : watchPartyWaitingReason === 'host_buffering' ? t('watch_party.host_buffering', { defaultValue: 'Host buffering...' })
+                  : t('watch_party.syncing', { defaultValue: 'Syncing with host...' })}
+               </Text>
+            </View>
+          )}
       </View>
 
       {/* Resume Popup / Seek Loading — inside player */}
@@ -679,7 +750,9 @@ export default function CustomVideoPlayer({
       )}
     </View>
   );
-}
+});
+
+export default CustomVideoPlayer;
 
 const styles = StyleSheet.create({
   container: {

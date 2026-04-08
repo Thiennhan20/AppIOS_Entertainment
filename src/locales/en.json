@@ -249,7 +249,18 @@
     "signinRequired": "Sign In Required",
     "signinDesc": "You need to sign in to join a streaming room.",
     "backToLobby": "Back to Lobby",
-    "hostedBy": "Hosted by"
+    "hostedBy": "Hosted by",
+    "watchParty": "Watch Party",
+    "watchPartyDesc": "Co-watch movies and chat seamlessly.",
+    "joinExisting": "Join an existing room",
+    "enterRoomId": "Enter Room ID",
+    "activeRooms": "Active Rooms",
+    "loading": "Loading...",
+    "noActiveRooms": "No active rooms available.",
+    "untitledRoom": "Untitled Room",
+    "host": "Host",
+    "howToCreateRoom": "How to create a Watch Party?",
+    "createRoomGuide": "To create a room, please go to the detail page of the movie you want to watch, start playing it, and click the 'Watch Together / Create Room' button below the video player. The invite ID will be listed at the top of the chat section."
   },
   "filter": {
     "action": "Action",

@@ -1,5 +1,6 @@
 import React, { useState, useCallback } from 'react';
-import { View, Text, StyleSheet, FlatList, TouchableOpacity, Image, ActivityIndicator, Alert, Vibration } from 'react-native';
+import { View, Text, StyleSheet, FlatList, TouchableOpacity, ActivityIndicator, Alert, Vibration } from 'react-native';
+import { Image } from 'expo-image';
 import { useFocusEffect } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -78,6 +79,7 @@ export default function UserListScreen({ route, navigation }: any) {
         <Image 
           source={{ uri: imageUrl || 'https://via.placeholder.com/400x600?text=NTN' }} 
           style={styles.poster} 
+          contentFit="cover"
         />
         <Text style={styles.cardTitle} numberOfLines={1}>{itemTitle}</Text>
         {type === 'history' && item.currentTime > 0 && (
@@ -182,7 +184,6 @@ const styles = StyleSheet.create({
     width: '100%',
     aspectRatio: 2/3,
     borderRadius: 6,
-    resizeMode: 'cover',
   },
   progressContainer: {
     height: 3,
