@@ -117,7 +117,19 @@ export default function SettingsScreen({ navigation }: any) {
       });
 
       if (!result.canceled && result.assets && result.assets.length > 0) {
-        const base64Str = result.assets[0].base64;
+        const asset = result.assets[0];
+        const base64Str = asset.base64;
+        
+        let sizeInBytes = asset.fileSize;
+        if (!sizeInBytes && base64Str) {
+          sizeInBytes = (base64Str.length * 3) / 4;
+        }
+
+        if (sizeInBytes && sizeInBytes > 5 * 1024 * 1024) {
+          showAlert(t('general.error') || 'Error', t('profile.file_too_large') || 'Image size must be less than 5MB', true);
+          return;
+        }
+
         if (base64Str) {
           setAvatarBase64(base64Str);
         }

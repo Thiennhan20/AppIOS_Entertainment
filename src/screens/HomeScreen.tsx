@@ -78,7 +78,7 @@ function SideMenu({
       onPress={onPress}
       activeOpacity={0.7}
     >
-      <Ionicons name={icon} size={18} color={active ? '#fff' : '#888'} style={ms.navIcon} />
+      <Ionicons name={icon} size={15} color={active ? '#fff' : '#888'} style={ms.navIcon} />
       <Text style={[ms.navLabel, active && ms.navLabelActive]}>{label}</Text>
       {chevron && (
         <Ionicons

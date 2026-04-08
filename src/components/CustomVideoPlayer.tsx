@@ -47,6 +47,11 @@ export default function CustomVideoPlayer({
   const seekTargetRef = useRef(0);
   const [isSeekingUi, setIsSeekingUi] = useState(false);
 
+  // Stalled/Buffering detection
+  const lastPolledTimeRef = useRef(-1);
+  const isBufferingRef = useRef(false);
+  const [isBufferingUi, setIsBufferingUi] = useState(false);
+
   // Resume popup state
   const [resumePopup, setResumePopup] = useState<{ show: boolean; savedTime: number }>({ show: false, savedTime: 0 });
   const [checkingResume, setCheckingResume] = useState(true);
@@ -218,6 +223,29 @@ export default function CustomVideoPlayer({
     const interval = setInterval(() => {
       if (player) {
         const newTime = player.currentTime || 0;
+
+        // Buffering/Stall detection
+        if (player.playing && !isSeekingRef.current && lastPolledTimeRef.current !== -1) {
+          const diff = newTime - lastPolledTimeRef.current;
+          const isAtEnd = player.duration > 0 && Math.abs(player.duration - newTime) < 0.5;
+          if (diff >= 0 && diff < 0.05 && !isAtEnd) { 
+             if (!isBufferingRef.current) {
+               isBufferingRef.current = true;
+               setIsBufferingUi(true);
+             }
+          } else {
+             if (isBufferingRef.current) {
+               isBufferingRef.current = false;
+               setIsBufferingUi(false);
+             }
+          }
+        } else if (!player.playing || isSeekingRef.current) {
+           if (isBufferingRef.current) {
+             isBufferingRef.current = false;
+             setIsBufferingUi(false);
+           }
+        }
+        lastPolledTimeRef.current = newTime;
 
         // Batch all player state into a single setState
         setPlayerState(prev => {
@@ -606,11 +634,11 @@ export default function CustomVideoPlayer({
               <Ionicons name="play-back-outline" size={42} color="white" />
             </TouchableOpacity>
             
-            <TouchableOpacity onPress={togglePlay} style={[styles.controlBtn, { marginHorizontal: 45, width: 70, height: 70, justifyContent: 'center', alignItems: 'center' }]}>
-              {isSeekingUi ? (
-                <ActivityIndicator size="large" color="white" style={{ transform: [{ scale: 1.2 }] }} />
+            <TouchableOpacity onPress={togglePlay} style={[styles.controlBtn, { marginHorizontal: 45, width: 90, height: 90, justifyContent: 'center', alignItems: 'center' }]}>
+              {isSeekingUi || isBufferingUi ? (
+                <ActivityIndicator size="large" color="white" style={{ transform: [{ scale: 1.5 }] }} />
               ) : (
-                <Ionicons name={playerState.isPlaying ? "pause-circle-outline" : "play-circle-outline"} size={70} color="white" style={{ position: 'absolute' }} />
+                <Ionicons name={playerState.isPlaying ? "pause-circle-outline" : "play-circle-outline"} size={70} color="white" />
               )}
             </TouchableOpacity>
             

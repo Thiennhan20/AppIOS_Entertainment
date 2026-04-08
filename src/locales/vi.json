@@ -136,7 +136,8 @@
     "permission_needed": "Rất tiếc, chúng tôi cần quyền truy cập thư viện ảnh để thực hiện chức năng này!",
     "username_label": "Tên hiển thị",
     "email_google_label": "Email (Tài khoản Google)",
-    "error_choosing_image": "Lỗi khi chọn ảnh"
+    "error_choosing_image": "Lỗi khi chọn ảnh",
+    "file_too_large": "Kích thước ảnh phải nhỏ hơn 5MB"
   },
   "search": {
     "search_movies_series": "Tìm kiếm phim, series...",
