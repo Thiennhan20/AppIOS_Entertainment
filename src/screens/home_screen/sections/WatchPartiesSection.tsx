@@ -1,6 +1,7 @@
 import React from 'react';
 import { View, Text, TouchableOpacity, FlatList } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useTranslation } from 'react-i18next';
 import { useTheme } from '../../../context/ThemeContext';
 import { styles } from '../homeStyles';
 
@@ -11,6 +12,7 @@ type Props = {
 
 export default function WatchPartiesSection({ section, navigation }: Props) {
   const { themeColor } = useTheme();
+  const { t } = useTranslation();
 
   return (
     <View style={{ paddingBottom: 15 }}>
@@ -32,7 +34,7 @@ export default function WatchPartiesSection({ section, navigation }: Props) {
               navigation.navigate('StreamingRoomScreen', {
                 roomId: item.room_id,
                 initialStreamUrl: '',
-                initialTitle: item.title || 'Watch Party',
+                initialTitle: item.title || t('streaming.watchParty'),
                 isHost: false
               });
             }}
@@ -49,7 +51,7 @@ export default function WatchPartiesSection({ section, navigation }: Props) {
             </View>
           </TouchableOpacity>
         )}
-        ListEmptyComponent={<Text style={{ color: '#666', marginLeft: 18, fontStyle: 'italic' }}>Chưa có phòng nào đang mở. Hãy làm người đầu tiên!</Text>}
+        ListEmptyComponent={<Text style={{ color: '#666', marginLeft: 18, fontStyle: 'italic' }}>{t('home.no_rooms_open')}</Text>}
       />
     </View>
   );

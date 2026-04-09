@@ -62,7 +62,18 @@
     "just_now": "Vừa xong",
     "mins_ago": "phút trước",
     "hours_ago": "giờ trước",
-    "days_ago": "ngày trước"
+    "days_ago": "ngày trước",
+    "watch_parties": "🔥 Phòng Đang Xem Chung",
+    "top10_trending": "🍿 Top 10 Thịnh Hành Hôm Nay",
+    "top_cast": "⭐ Diễn Viên Được Yêu Thích",
+    "ai_picks": "✨ AI Đề Xuất Riêng Cho Bạn",
+    "coming_soon_section": "⏳ Sắp Ra Mắt (Đặt Lịch Theo Dõi)",
+    "action_adrenaline": "💥 Đẩy Cao Trào, Xả Stress Mới Phê",
+    "anime_world": "👺 Lặn Sâu Vào Thế Giới Wibu",
+    "horror_night": "👻 Dành Riêng Cho Đêm Khuya Không Ngủ",
+    "romance_rain": "☔ Khóc Thêm Chút Nữa Mưa Rơi",
+    "loading_more": "Đang tải thêm...",
+    "no_rooms_open": "Chưa có phòng nào đang mở. Hãy làm người đầu tiên!"
   },
   "player": {
     "episodes": "Tập phim",

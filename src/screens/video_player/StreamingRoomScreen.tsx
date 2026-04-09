@@ -1,12 +1,14 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { 
   StyleSheet, Text, View, Dimensions, TouchableOpacity, 
-  ActivityIndicator, TextInput, KeyboardAvoidingView, Platform, ScrollView, Animated, FlatList, Share
+  ActivityIndicator, TextInput, KeyboardAvoidingView, Platform, ScrollView, Animated, FlatList, Share, StatusBar
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
 import * as Clipboard from 'expo-clipboard';
+import * as ScreenOrientation from 'expo-screen-orientation';
 import { useTheme } from '../../context/ThemeContext';
 import CustomVideoPlayer, { CustomVideoPlayerRef } from '../../components/CustomVideoPlayer';
 import { useWatchPartySocket } from '../../hooks/useWatchPartySocket';
@@ -219,9 +221,36 @@ export default function StreamingRoomScreen({ route, navigation }: any) {
 
   const [isFullscreen, setIsFullscreen] = useState(false);
 
-  const toggleFullscreen = () => {
-    setIsFullscreen(!isFullscreen);
+  // Hide tab bar when fullscreen
+  useFocusEffect(
+    React.useCallback(() => {
+      navigation.getParent()?.setOptions({
+        tabBarStyle: { display: isFullscreen ? 'none' : 'flex' },
+      });
+      return () => {
+        navigation.getParent()?.setOptions({
+          tabBarStyle: { display: 'flex' },
+        });
+      };
+    }, [navigation, isFullscreen])
+  );
+
+  const toggleFullscreen = async () => {
+    if (isFullscreen) {
+      await ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.PORTRAIT_UP);
+      setIsFullscreen(false);
+    } else {
+      await ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.LANDSCAPE);
+      setIsFullscreen(true);
+    }
   };
+
+  // Restore portrait on unmount
+  useEffect(() => {
+    return () => {
+      ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.PORTRAIT_UP);
+    };
+  }, []);
 
   const handleLocalPlay = (time: number) => {
     if (syncLockRef.current || !isHost) return;
@@ -263,6 +292,8 @@ export default function StreamingRoomScreen({ route, navigation }: any) {
 
   return (
     <KeyboardAvoidingView style={styles.container} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+      {isFullscreen && <StatusBar hidden />}
+      {!isFullscreen && (
       <View style={[styles.header, { paddingTop: insets.top }]}>
         <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
           <Ionicons name="arrow-back" size={24} color="white" />
@@ -296,6 +327,7 @@ export default function StreamingRoomScreen({ route, navigation }: any) {
           </TouchableOpacity>
         )}
       </View>
+      )}
 
       <View style={isFullscreen ? styles.fullscreenPlayerWrapper : styles.playerWrapper}>
         {streamUrl ? (

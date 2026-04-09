@@ -62,7 +62,18 @@
     "just_now": "Just now",
     "mins_ago": "mins ago",
     "hours_ago": "hours ago",
-    "days_ago": "days ago"
+    "days_ago": "days ago",
+    "watch_parties": "🔥 Active Watch Parties",
+    "top10_trending": "🍿 Top 10 Trending Today",
+    "top_cast": "⭐ Fan-Favorite Actors",
+    "ai_picks": "✨ AI Picks Just For You",
+    "coming_soon_section": "⏳ Coming Soon (Set Reminders)",
+    "action_adrenaline": "💥 Adrenaline Rush, Stress Relief",
+    "anime_world": "👺 Dive Deep Into Anime World",
+    "horror_night": "👻 For Those Late-Night Watchers",
+    "romance_rain": "☔ Cry A Little More In The Rain",
+    "loading_more": "Loading more...",
+    "no_rooms_open": "No rooms open yet. Be the first one!"
   },
   "player": {
     "episodes": "Episodes",

@@ -429,11 +429,11 @@ export default function HomeScreen({ navigation }: any) {
   const finalSections = useMemo(() => {
     const baseSections: any[] = [
       { id: 'featured', type: 'FEATURED' },
-      { id: 'watch_parties', label: '🔥 Phòng Đang Xem Chung', data: activeRooms, type: 'WATCH_PARTIES' },
-      { id: 'trending_movies', label: '🍿 Top 10 Thịnh Hành Hôm Nay', data: trendingMovies.slice(0, 10), type: 'TOP_10', isTV: false, isHistory: false, isWatchlist: false },
+      { id: 'watch_parties', label: t('home.watch_parties'), data: activeRooms, type: 'WATCH_PARTIES' },
+      { id: 'trending_movies', label: t('home.top10_trending'), data: trendingMovies.slice(0, 10), type: 'TOP_10', isTV: false, isHistory: false, isWatchlist: false },
       { id: 'history', label: `▶️ ${t('home.continue_watching')}`, data: recentlyWatched, type: 'MOVIE_ROW', isTV: false, isHistory: true, isWatchlist: false },
-      { id: 'top_cast', label: '⭐ Diễn Viên Được Yêu Thích', data: topCast, type: 'TOP_CAST' },
-      { id: 'ai_picks', label: '✨ AI Đề Xuất Riêng Cho Bạn', data: topRated.slice(0, 10), type: 'AI_PICKS', isTV: false },
+      { id: 'top_cast', label: t('home.top_cast'), data: topCast, type: 'TOP_CAST' },
+      { id: 'ai_picks', label: t('home.ai_picks'), data: topRated.slice(0, 10), type: 'AI_PICKS', isTV: false },
       { id: 'trending_tv', label: t('home.top_tv_shows'), data: trendingTV.slice(0, 10), type: 'MOVIE_ROW', isTV: true, isHistory: false, isWatchlist: false },
       { id: 'watchlist_row', label: t('home.your_watchlist'), data: watchlist, type: 'MOVIE_ROW', isTV: false, isHistory: false, isWatchlist: true },
       { id: 'top_comments', type: 'TOP_COMMENTS', data: topComments },
@@ -442,11 +442,11 @@ export default function HomeScreen({ navigation }: any) {
 
     if (phase2Loaded) {
       baseSections.push(
-        { id: 'upcoming', label: '⏳ Sắp Ra Mắt (Đặt Lịch Theo Dõi)', data: upcoming, type: 'COMING_SOON', isTV: false, isHistory: false, isWatchlist: false },
-        { id: 'action', label: '💥 Đẩy Cao Trào, Xả Stress Mới Phê', data: actionMovies, type: 'MOVIE_ROW', isTV: false, isHistory: false, isWatchlist: false },
-        { id: 'anime', label: '👺 Lặn Sâu Vào Thế Giới Wibu', data: anime, type: 'MOVIE_ROW', isTV: true, isHistory: false, isWatchlist: false },
-        { id: 'horror', label: '👻 Dành Riêng Cho Đêm Khuya Không Ngủ', data: horrorMovies, type: 'MOVIE_ROW', isTV: false, isHistory: false, isWatchlist: false },
-        { id: 'romance', label: '☔ Khóc Thêm Chút Nữa Mưa Rơi', data: romanceMovies, type: 'MOVIE_ROW', isTV: false, isHistory: false, isWatchlist: false }
+        { id: 'upcoming', label: t('home.coming_soon_section'), data: upcoming, type: 'COMING_SOON', isTV: false, isHistory: false, isWatchlist: false },
+        { id: 'action', label: t('home.action_adrenaline'), data: actionMovies, type: 'MOVIE_ROW', isTV: false, isHistory: false, isWatchlist: false },
+        { id: 'anime', label: t('home.anime_world'), data: anime, type: 'MOVIE_ROW', isTV: true, isHistory: false, isWatchlist: false },
+        { id: 'horror', label: t('home.horror_night'), data: horrorMovies, type: 'MOVIE_ROW', isTV: false, isHistory: false, isWatchlist: false },
+        { id: 'romance', label: t('home.romance_rain'), data: romanceMovies, type: 'MOVIE_ROW', isTV: false, isHistory: false, isWatchlist: false }
       );
     }
 
@@ -597,7 +597,7 @@ export default function HomeScreen({ navigation }: any) {
         windowSize={5}
         onEndReached={fetchPhase2}
         onEndReachedThreshold={0.5}
-        ListFooterComponent={loadingPhase2 ? <View style={{ height: 200, justifyContent: 'center' }}><ActivityIndicator size="large" color={themeColor} /><Text style={{color: 'gray', textAlign: 'center', marginTop: 10}}>Loading more...</Text></View> : null}
+        ListFooterComponent={loadingPhase2 ? <View style={{ height: 200, justifyContent: 'center' }}><ActivityIndicator size="large" color={themeColor} /><Text style={{color: 'gray', textAlign: 'center', marginTop: 10}}>{t('home.loading_more')}</Text></View> : null}
       />
 
       {/* Trailer Modal */}

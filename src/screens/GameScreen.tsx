@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { 
   StyleSheet, Text, View, TextInput, TouchableOpacity, 
-  Image, ActivityIndicator, Alert, ScrollView, Animated
+  Image, ActivityIndicator, Alert, ScrollView, Animated,
+  KeyboardAvoidingView, Platform
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -105,7 +106,15 @@ export default function GameScreen() {
   const posterUri = `https://image.tmdb.org/t/p/w500${currentMovie.poster_path}`;
 
   return (
-    <ScrollView style={[styles.container, { paddingTop: insets.top }]}>
+    <KeyboardAvoidingView 
+      style={{ flex: 1, backgroundColor: '#0f0f13' }} 
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+    >
+    <ScrollView 
+      style={[styles.container, { paddingTop: insets.top }]}
+      keyboardShouldPersistTaps="handled"
+      contentContainerStyle={{ paddingBottom: 40 }}
+    >
       <View style={styles.header}>
         <Text style={styles.headerTitle}>NTN Games 🎮</Text>
         <View style={[styles.scoreBadge, { backgroundColor: `${themeColor}33`, borderColor: themeColor, borderWidth: 1 }]}>
@@ -159,6 +168,7 @@ export default function GameScreen() {
         </View>
       </Animated.View>
     </ScrollView>
+    </KeyboardAvoidingView>
   );
 }
 

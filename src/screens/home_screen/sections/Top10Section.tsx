@@ -32,11 +32,11 @@ export default function Top10Section({ section, navigation }: Props) {
           const isDoubleDigit = (index + 1) >= 10;
           return (
             <TouchableOpacity
-              style={{ marginRight: 20, position: 'relative', width: isDoubleDigit ? 185 : 150, height: 160, display: 'flex', flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'flex-end' }}
+              style={{ marginRight: 20, position: 'relative', width: isDoubleDigit ? 185 : 150, height: 200, display: 'flex', flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'flex-end' }}
               onPress={() => navigation.navigate('DetailScreen', { item, isTV: section.isTV })}
               activeOpacity={0.8}
             >
-              <View style={{ position: 'absolute', bottom: -25, left: -5, width: isDoubleDigit ? 185 : 90, height: 160, zIndex: 20, elevation: 20 }}>
+              <View style={{ position: 'absolute', bottom: 0, left: -5, width: isDoubleDigit ? 185 : 90, height: 200, zIndex: 20, elevation: 20 }}>
                 {/* Number Outline (Shadow Layer) */}
                 {isDoubleDigit ? (
                   <>
@@ -89,7 +89,7 @@ export default function Top10Section({ section, navigation }: Props) {
                 position: 'absolute',
                 left: isDoubleDigit ? 30 : undefined,
                 right: isDoubleDigit ? undefined : 0,
-                bottom: -5,
+                bottom: 25,
                 transform: [
                   { perspective: 800 },
                   { rotateX: '45deg' },

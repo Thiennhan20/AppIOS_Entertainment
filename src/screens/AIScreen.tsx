@@ -81,7 +81,11 @@ export default function AIScreen() {
   };
 
   return (
-    <View style={[styles.container, { paddingTop: insets.top }]}>
+    <KeyboardAvoidingView 
+      style={[styles.container, { paddingTop: insets.top }]} 
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
+    >
       <View style={styles.header}>
         <Text style={styles.headerTitle}>AI Hub ✨</Text>
         <TouchableOpacity onPress={clearHistory}>
@@ -96,6 +100,7 @@ export default function AIScreen() {
         keyExtractor={(_, index) => index.toString()}
         contentContainerStyle={styles.chatArea}
         showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
       />
 
       {isLoading && (
@@ -107,7 +112,7 @@ export default function AIScreen() {
 
       {/* Quick Replies */}
       <View style={{height: 50}}>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.quickRepliesContent}>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.quickRepliesContent} keyboardShouldPersistTaps="handled">
           {QUICK_REPLIES.map((text, i) => (
             <TouchableOpacity key={i} style={[styles.chip, { borderColor: themeColor, backgroundColor: `${themeColor}1A` }]} onPress={() => handleSend(text)}>
               <Text style={[styles.chipText, { color: themeColor }]}>{text}</Text>
@@ -128,7 +133,7 @@ export default function AIScreen() {
           <Ionicons name="send" size={20} color="white" />
         </TouchableOpacity>
       </View>
-    </View>
+    </KeyboardAvoidingView>
   );
 }
 
