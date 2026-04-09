@@ -1,8 +1,6 @@
 import React from 'react';
 import { View, Text, TouchableOpacity } from 'react-native';
 import { Image } from 'expo-image';
-import { LinearGradient } from 'expo-linear-gradient';
-import MaskedView from '@react-native-masked-view/masked-view';
 import { useTheme } from '../../../context/ThemeContext';
 import { styles } from '../homeStyles';
 import { FlatList } from 'react-native';
@@ -13,7 +11,7 @@ type Props = {
 };
 
 export default function Top10Section({ section, navigation }: Props) {
-  const { themeColor, themeGradient } = useTheme();
+  const { themeColor } = useTheme();
 
   return (
     <View style={{ paddingBottom: 15, marginTop: 10 }}>
@@ -27,88 +25,56 @@ export default function Top10Section({ section, navigation }: Props) {
         initialNumToRender={4}
         maxToRenderPerBatch={4}
         windowSize={3}
-        removeClippedSubviews={true}
+        removeClippedSubviews={false}
         renderItem={({ item, index }) => {
-          const isDoubleDigit = (index + 1) >= 10;
+          const num = index + 1;
+          const isWide = num >= 10;
+
           return (
             <TouchableOpacity
-              style={{ marginRight: 20, position: 'relative', width: isDoubleDigit ? 185 : 150, height: 200, display: 'flex', flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'flex-end' }}
+              style={{ marginRight: 12, width: isWide ? 160 : 140, height: 165 }}
               onPress={() => navigation.navigate('DetailScreen', { item, isTV: section.isTV })}
               activeOpacity={0.8}
             >
-              <View style={{ position: 'absolute', bottom: 0, left: -5, width: isDoubleDigit ? 185 : 90, height: 200, zIndex: 20, elevation: 20 }}>
-                {/* Number Outline (Shadow Layer) */}
-                {isDoubleDigit ? (
-                  <>
-                    <Text style={{ position: 'absolute', left: -10, bottom: 0, fontSize: 130, fontWeight: '900', color: '#16161e', textShadowColor: '#111', textShadowOffset: {width: 3, height: 0}, textShadowRadius: 3 }}>
-                      {(index + 1).toString()[0]}
-                    </Text>
-                    <Text style={{ position: 'absolute', left: 80, bottom: 0, fontSize: 130, fontWeight: '900', color: '#16161e', textShadowColor: '#111', textShadowOffset: {width: 3, height: 0}, textShadowRadius: 3 }}>
-                      {(index + 1).toString()[1]}
-                    </Text>
-                  </>
-                ) : (
-                  <Text style={{ position: 'absolute', bottom: 0, left: 0, fontSize: 130, fontWeight: '900', color: '#16161e', textShadowColor: '#111', textShadowOffset: {width: 3, height: 0}, textShadowRadius: 3, letterSpacing: -8 }}>
-                    {index + 1}
-                  </Text>
-                )}
-                
-                {/* Gradient Number inside MaskedView */}
-                <MaskedView
-                  style={{ position: 'absolute', height: '100%', width: '100%', zIndex: 11 }}
-                  maskElement={
-                    isDoubleDigit ? (
-                      <View style={{ flex: 1, position: 'relative' }}>
-                        <Text style={{ position: 'absolute', left: -10, bottom: 0, fontSize: 130, fontWeight: '900', color: 'black' }}>
-                          {(index + 1).toString()[0]}
-                        </Text>
-                        <Text style={{ position: 'absolute', left: 80, bottom: 0, fontSize: 130, fontWeight: '900', color: 'black' }}>
-                          {(index + 1).toString()[1]}
-                        </Text>
-                      </View>
-                    ) : (
-                      <Text style={{ position: 'absolute', left: 0, bottom: 0, fontSize: 130, fontWeight: '900', color: 'black', letterSpacing: -8, backgroundColor: 'transparent' }}>
-                        {index + 1}
-                      </Text>
-                    )
-                  }
-                >
-                  <LinearGradient
-                    colors={(themeGradient as [string, string]) || [themeColor, '#ffffff']}
-                    start={{ x: 0, y: 0 }}
-                    end={{ x: 1, y: 1 }}
-                    style={{ flex: 1 }}
-                  />
-                </MaskedView>
-              </View>
-
-              {/* 3D Leaning Poster */}
+              {/* Poster — rendered first = behind */}
               <View style={{
-                zIndex: 5,
-                elevation: 5,
                 position: 'absolute',
-                left: isDoubleDigit ? 30 : undefined,
-                right: isDoubleDigit ? undefined : 0,
-                bottom: 25,
+                right: 0,
+                bottom: 0,
                 transform: [
-                  { perspective: 800 },
-                  { rotateX: '45deg' },
-                  { rotateY: '-15deg' },
-                  { rotateZ: '-5deg' },
-                  { translateY: 15 },
-                  { scale: 1.15 }
+                  { perspective: 500 },
+                  { rotateY: '-10deg' },
+                  { rotateZ: '-2deg' },
                 ],
                 shadowColor: '#000',
-                shadowOffset: { width: -5, height: 10 },
-                shadowOpacity: 0.6,
-                shadowRadius: 10,
+                shadowOffset: { width: -3, height: 6 },
+                shadowOpacity: 0.5,
+                shadowRadius: 8,
+                elevation: 1,
               }}>
-                <Image 
-                  source={{ uri: `https://image.tmdb.org/t/p/w200${item.poster_path}` }} 
-                  style={{ width: 105, height: 150, borderRadius: 10, borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)' }} 
-                  contentFit="cover" transition={200} cachePolicy="memory-disk" 
+                <Image
+                  source={{ uri: `https://image.tmdb.org/t/p/w200${item.poster_path}` }}
+                  style={{ width: 100, height: 150, borderRadius: 10 }}
+                  contentFit="cover" transition={200} cachePolicy="memory-disk"
                 />
               </View>
+
+              {/* Number — rendered second = on top */}
+              <Text style={{
+                position: 'absolute',
+                left: -5,
+                bottom: -8,
+                fontSize: 90,
+                fontWeight: '900',
+                color: themeColor,
+                textShadowColor: 'rgba(0,0,0,0.8)',
+                textShadowOffset: { width: 2, height: 2 },
+                textShadowRadius: 4,
+                zIndex: 99,
+                elevation: 99,
+              }}>
+                {num}
+              </Text>
             </TouchableOpacity>
           );
         }}
@@ -116,3 +82,5 @@ export default function Top10Section({ section, navigation }: Props) {
     </View>
   );
 }
+
+
