@@ -109,6 +109,26 @@ export const phimApi = {
       const titleForSearch = normalizeTitle(title);
       const originNameWithSeason = `${title} (Season ${selectedSeason})`;
 
+      const extractSeason = (text: string): number | null => {
+        const patterns = [
+            /ph[aầ]n[-\s]*(\d+)/i,
+            /season[-\s]*(\d+)/i,
+            /m[uù]a[-\s]*(\d+)/i,
+            /part[-\s]*(\d+)/i,
+            /\bs(\d{1,2})\b/i,
+        ];
+        for (const p of patterns) {
+            const m = text.match(p);
+            if (m) return parseInt(m[1], 10);
+        }
+        const trailing = text.match(/-(\d+)$|\s(\d+)$/);
+        if (trailing) {
+          const num = parseInt(trailing[1] || trailing[2], 10);
+          if (num < 100) return num;
+        }
+        return null;
+      };
+
       const checkEpisodeExists = (episodes: any[]) => {
         if (!episodes || episodes.length === 0) return false;
         return episodes.some((group: any) => {
@@ -129,16 +149,50 @@ export const phimApi = {
         try {
           const searchData: any = await apiClient.get('/search', { params: { keyword } });
           if (searchData?.status === 'success' && searchData.data?.items) {
-             for (const item of searchData.data.items) {
+             
+             // Sort and score items first
+             let processedItems = searchData.data.items.map((item: any) => {
+               let score = 0;
+               let isWrongSeason = false;
+               if (isTV) {
+                 const itemText = `${item.name || ''} ${item.origin_name || ''} ${item.slug || ''}`.toLowerCase();
+                 const itemSeason = extractSeason(itemText);
+                 if (itemSeason !== null && itemSeason !== selectedSeason) {
+                   isWrongSeason = true;
+                   score -= 200; // heavy penalty
+                 } else if (itemSeason === selectedSeason) {
+                   score += 50;
+                 }
+               }
+               return { ...item, score, isWrongSeason };
+             });
+             
+             // Sort by score desc
+             processedItems.sort((a: any, b: any) => b.score - a.score);
+
+             for (const item of processedItems) {
+               // Reject totally mismatched seasons
+               if (isTV && item.isWrongSeason) continue;
+               
                try {
                  const detailData: any = await apiClient.get(`/detail/${item.slug}`);
+                 
+                 // Deep verify season from detail
+                 if (isTV) {
+                   const detailText = `${detailData.movie?.name || ''} ${detailData.movie?.origin_name || ''} ${detailData.movie?.slug || item.slug}`.toLowerCase();
+                   const detailSeason = extractSeason(detailText);
+                   if (detailSeason !== null && detailSeason !== selectedSeason) {
+                     continue; // Detail data shows wrong season
+                   }
+                 }
+
                  if (checkEpisodeExists(detailData.episodes)) {
                     return { slug: item.slug, detailData };
                  }
                } catch (e) {}
              }
              
-             // Fallback: if it's a movie and we didn't match episode, just return the first item's details that HAS episodes
+             // Fallback for movie
              if (!isTV && searchData.data.items.length > 0) {
                const fallbackItem = searchData.data.items[0];
                const fbData: any = await apiClient.get(`/detail/${fallbackItem.slug}`);
@@ -151,6 +205,9 @@ export const phimApi = {
         return null;
       };
 
+      let tmdbViBaseName = titleForSearch;
+      let tmdbOriginBaseName = titleForSearch;
+
       // 1. Try tmdb directly
       try {
         const tmdbEndpoint = isTV ? `/tmdb/tv/${tmdbId}` : `/tmdb/movie/${tmdbId}`;
@@ -158,40 +215,38 @@ export const phimApi = {
         if (tmdbDirectData?.status === true && tmdbDirectData?.movie) {
            let isValidSeason = true;
            const apiSlug = tmdbDirectData.movie.slug;
-           
+           const apiName = tmdbDirectData.movie.name || '';
+           const apiOriginName = tmdbDirectData.movie.origin_name || '';
+
            if (isTV) {
-             const apiName = tmdbDirectData.movie.name || '';
-             const apiOriginName = tmdbDirectData.movie.origin_name || '';
-             
-             const extractSeason = (text: string): number | null => {
-               const patterns = [
-                   /ph[aầ]n[-\s]*(\d+)/i,
-                   /season[-\s]*(\d+)/i,
-                   /m[uù]a[-\s]*(\d+)/i,
-                   /part[-\s]*(\d+)/i,
-                   /\bs(\d{1,2})\b/i,
-               ];
-               for (const p of patterns) {
-                   const m = text.match(p);
-                   if (m) return parseInt(m[1], 10);
-               }
-               const trailing = text.match(/-(\d+)$|\s(\d+)$/);
-               if (trailing) {
-                 const num = parseInt(trailing[1] || trailing[2], 10);
-                 if (num < 100) return num;
-               }
-               return null;
-             };
-             
              const textToSearch = `${apiName} ${apiOriginName} ${apiSlug}`.toLowerCase();
              const detectedSeason = extractSeason(textToSearch);
              
+             if (apiOriginName) tmdbOriginBaseName = apiOriginName.replace(/\s*\(?(season|ph[aầ]n|m[uù]a)\s*\d+\)?/i, '').trim();
+             if (apiName) tmdbViBaseName = apiName.replace(/\s*\(?(season|ph[aầ]n|m[uù]a)\s*\d+\)?/i, '').trim();
+
              if (detectedSeason !== null && detectedSeason !== selectedSeason) {
-               isValidSeason = false;
+                isValidSeason = false;
+                
+                // Attempt to construct correct slug (like toan-chuc-phap-su-phan-1 -> phan-6)
+                const trySlug = apiSlug.replace(/(phan-|season-|mua-|-s)(\d+)/, `$1${selectedSeason}`);
+                if (trySlug !== apiSlug) {
+                  try {
+                    const tryDetail: any = await apiClient.get(`/detail/${trySlug}`);
+                    if (checkEpisodeExists(tryDetail.episodes)) {
+                       const tryText = `${tryDetail.movie?.name || ''} ${tryDetail.movie?.origin_name || ''} ${tryDetail.movie?.slug}`.toLowerCase();
+                       const trySeason = extractSeason(tryText);
+                       if (trySeason === selectedSeason || trySeason === null) {
+                          slug = trySlug;
+                          finalDetailData = tryDetail;
+                       }
+                    }
+                  } catch(e) {}
+                }
              }
            }
 
-           if (isValidSeason) {
+           if (isValidSeason && !slug) {
              const detailData: any = await apiClient.get(`/detail/${apiSlug}`);
              if (checkEpisodeExists(detailData.episodes) || !isTV) {
                 slug = apiSlug;
@@ -206,13 +261,17 @@ export const phimApi = {
          if (isTV) {
            const keywords = [
               originNameWithSeason,
+              `${tmdbOriginBaseName} (Season ${selectedSeason})`,
+              `${tmdbOriginBaseName} phần ${selectedSeason}`,
+              `${tmdbViBaseName} (Season ${selectedSeason})`,
+              `${tmdbViBaseName} phần ${selectedSeason}`,
               `${titleForSearch} phần ${selectedSeason}`,
-              `${titleForSearch} part ${selectedSeason}`,
               `${titleForSearch} season ${selectedSeason}`,
-              `${titleForSearch} tập ${selectedEpisode}`,
               title
            ];
-           for (const kw of keywords) {
+           // Unique strings
+           const uniqueKw = Array.from(new Set(keywords));
+           for (const kw of uniqueKw) {
              const res = await searchAndGetDetail(kw);
              if (res) {
                 slug = res.slug;
