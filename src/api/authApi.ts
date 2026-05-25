@@ -26,11 +26,6 @@ export const authApi = {
     return response.data;
   },
   
-  googleLogin: async (credential: string) => {
-    const response = await apiClient.post('/auth/google-login', { credential });
-    return response.data;
-  },
-  
   logout: async () => {
     try {
       await apiClient.post('/auth/logout');

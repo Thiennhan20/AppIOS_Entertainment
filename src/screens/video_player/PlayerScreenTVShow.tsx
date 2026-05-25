@@ -151,6 +151,12 @@ export default function PlayerScreenTVShow({ route, navigation }: any) {
   
   const [creatingRoom, setCreatingRoom] = useState(false);
 
+  // ── Auto Next Episode states ──
+  const [autoNextEnabled, setAutoNextEnabled] = useState(false);
+  const [showNextEpisodePopup, setShowNextEpisodePopup] = useState(false);
+  const [nextEpisodeCountdown, setNextEpisodeCountdown] = useState(5);
+  const countdownIntervalRef = useRef<NodeJS.Timeout | null>(null);
+
   const handleCreateWatchParty = async () => {
     if (!streamUrlState) {
       showAlert(t('common.error', { defaultValue: 'Error' }), "No stream URL available.", true);
@@ -220,6 +226,57 @@ export default function PlayerScreenTVShow({ route, navigation }: any) {
   const currentSeasonData = availableSeasons.find((s:any) => s.season_number === selectedSeason) || availableSeasons[0];
   const episodeCount = currentSeasonData?.episode_count || 50;
   const availableEpisodes = Array.from({ length: Math.max(1, episodeCount) }, (_, i) => i + 1);
+  const hasNextEpisode = selectedEpisode < episodeCount;
+
+  // ── Auto Next Episode Logic ──
+  const goToNextEpisode = () => {
+    if (selectedEpisode >= episodeCount) return;
+    const nextEp = selectedEpisode + 1;
+    setShowNextEpisodePopup(false);
+    setNextEpisodeCountdown(5);
+    if (countdownIntervalRef.current) { clearInterval(countdownIntervalRef.current); countdownIntervalRef.current = null; }
+    changeEpisode(nextEp, selectedSeason);
+  };
+
+  const handleVideoEnded = () => {
+    if (selectedServer !== 'Server 1') return;
+    if (selectedEpisode >= episodeCount) return;
+    setShowNextEpisodePopup(true);
+    setNextEpisodeCountdown(5);
+    if (autoNextEnabled) {
+      countdownIntervalRef.current = setInterval(() => {
+        setNextEpisodeCountdown(prev => {
+          if (prev <= 1) {
+            if (countdownIntervalRef.current) clearInterval(countdownIntervalRef.current);
+            return 0;
+          }
+          return prev - 1;
+        });
+      }, 1000);
+    }
+  };
+
+  // Auto-navigate when countdown reaches 0
+  useEffect(() => {
+    if (autoNextEnabled && nextEpisodeCountdown === 0 && showNextEpisodePopup) {
+      goToNextEpisode();
+    }
+  }, [autoNextEnabled, nextEpisodeCountdown, showNextEpisodePopup]);
+
+  // Cleanup countdown and hide popup on episode change
+  useEffect(() => {
+    setShowNextEpisodePopup(false);
+    setNextEpisodeCountdown(5);
+    return () => {
+      if (countdownIntervalRef.current) { clearInterval(countdownIntervalRef.current); countdownIntervalRef.current = null; }
+    };
+  }, [selectedEpisode]);
+
+  const handleDismissPopup = () => {
+    setShowNextEpisodePopup(false);
+    setNextEpisodeCountdown(5);
+    if (countdownIntervalRef.current) { clearInterval(countdownIntervalRef.current); countdownIntervalRef.current = null; }
+  };
 
   const formatTitle = (epNum: number, seasonNum: number, trackName?: string) => {
     const baseTitle = item?.title || item?.name || 'Unknown Title';
@@ -326,6 +383,7 @@ export default function PlayerScreenTVShow({ route, navigation }: any) {
                   episode={selectedEpisode}
                   title={titleState}
                   poster={item.poster_path ? `https://image.tmdb.org/t/p/w400${item.poster_path}` : ''}
+                  onVideoEnded={handleVideoEnded}
                 />
               ) : (
                 <EmbedPlayerInline url={streamUrlState} onToggleFullscreen={toggleFullscreen} isFullscreen={isFullscreen} />
@@ -334,6 +392,47 @@ export default function PlayerScreenTVShow({ route, navigation }: any) {
           ) : (
             <View style={styles.loadingContainer}>
               <Text style={{color:'gray'}}>{t('player.error_loading_stream', { defaultValue: 'Movie unavailable' })}</Text>
+            </View>
+          )}
+
+          {/* Next Episode Popup — inside player wrapper */}
+          {showNextEpisodePopup && hasNextEpisode && (
+            <View style={styles.nextEpisodeOverlay}>
+              <View style={styles.nextEpisodeBox}>
+                <Ionicons name="play-skip-forward" size={32} color="#10b981" style={{ marginBottom: 10 }} />
+                <Text style={{ color: 'white', fontSize: 16, fontWeight: 'bold', marginBottom: 6, textAlign: 'center' }}>
+                  {t('player.next_episode', { defaultValue: 'Next' })}: {t('general.episode', { defaultValue: 'Episode' })} {selectedEpisode + 1}
+                </Text>
+
+                {autoNextEnabled ? (
+                  <>
+                    <Text style={{ color: '#aaa', fontSize: 13, marginBottom: 12 }}>
+                      {t('player.playing_next_in', { defaultValue: 'Playing next in' })}
+                    </Text>
+                    <View style={{ width: 56, height: 56, borderRadius: 28, borderWidth: 3, borderColor: '#10b981', justifyContent: 'center', alignItems: 'center', marginBottom: 16 }}>
+                      <Text style={{ color: 'white', fontSize: 24, fontWeight: 'bold' }}>{nextEpisodeCountdown}</Text>
+                    </View>
+                    <View style={{ flexDirection: 'row', gap: 10 }}>
+                      <TouchableOpacity style={{ backgroundColor: '#10b981', paddingHorizontal: 20, paddingVertical: 10, borderRadius: 8 }} onPress={goToNextEpisode}>
+                        <Text style={{ color: 'white', fontWeight: 'bold', fontSize: 14 }}>{t('player.play_now', { defaultValue: 'Play Now' })}</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity style={{ backgroundColor: '#333', paddingHorizontal: 20, paddingVertical: 10, borderRadius: 8 }} onPress={handleDismissPopup}>
+                        <Text style={{ color: 'white', fontWeight: 'bold', fontSize: 14 }}>{t('common.cancel', { defaultValue: 'Cancel' })}</Text>
+                      </TouchableOpacity>
+                    </View>
+                  </>
+                ) : (
+                  <View style={{ flexDirection: 'row', gap: 10, marginTop: 8 }}>
+                    <TouchableOpacity style={{ backgroundColor: '#10b981', paddingHorizontal: 20, paddingVertical: 10, borderRadius: 8, flexDirection: 'row', alignItems: 'center', gap: 6 }} onPress={goToNextEpisode}>
+                      <Ionicons name="play-skip-forward" size={16} color="white" />
+                      <Text style={{ color: 'white', fontWeight: 'bold', fontSize: 14 }}>{t('player.next_episode_btn', { defaultValue: 'Next Episode' })}</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity style={{ backgroundColor: '#333', paddingHorizontal: 20, paddingVertical: 10, borderRadius: 8 }} onPress={handleDismissPopup}>
+                      <Text style={{ color: 'white', fontWeight: 'bold', fontSize: 14 }}>{t('common.dismiss', { defaultValue: 'Dismiss' })}</Text>
+                    </TouchableOpacity>
+                  </View>
+                )}
+              </View>
             </View>
           )}
         </View>
@@ -355,6 +454,25 @@ export default function PlayerScreenTVShow({ route, navigation }: any) {
                 </View>
               )}
             </View>
+
+            {/* Auto Next Toggle */}
+            {selectedServer === 'Server 1' && hasNextEpisode && (
+              <View style={{ paddingHorizontal: 15, paddingBottom: 8 }}>
+                <TouchableOpacity
+                  style={[styles.toggleCommentBtn, {
+                    backgroundColor: autoNextEnabled ? '#10b98133' : '#1E1E1E',
+                    borderWidth: autoNextEnabled ? 1 : 0,
+                    borderColor: autoNextEnabled ? '#10b981' : 'transparent',
+                  }]}
+                  onPress={() => setAutoNextEnabled(prev => !prev)}
+                >
+                  <Ionicons name="play-skip-forward-outline" size={20} color={autoNextEnabled ? '#10b981' : '#aaa'} />
+                  <Text style={[styles.toggleCommentText, { color: autoNextEnabled ? '#10b981' : '#aaa', fontSize: 14 }]}>
+                    {t('player.auto_next', { defaultValue: 'Auto Next' })} {autoNextEnabled ? 'ON' : 'OFF'}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            )}
 
             <View style={{ flexDirection: 'row', gap: 10, paddingHorizontal: 15, paddingBottom: 10 }}>
               {selectedServer !== 'Server 3' && (
@@ -440,6 +558,7 @@ export default function PlayerScreenTVShow({ route, navigation }: any) {
         isError={alertInfo.isError}
         onClose={() => setAlertInfo(prev => ({ ...prev, visible: false }))}
       />
+
 
     </View>
   );
@@ -659,6 +778,23 @@ const styles = StyleSheet.create({
     backgroundColor: '#E50914',
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  nextEpisodeOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0,0,0,0.8)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 100,
+  },
+  nextEpisodeBox: {
+    backgroundColor: '#1c1c1c',
+    borderRadius: 16,
+    paddingHorizontal: 24,
+    paddingVertical: 22,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#333',
+    maxWidth: 320,
   },
 
 });

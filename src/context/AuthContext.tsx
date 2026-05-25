@@ -2,7 +2,12 @@ import React, { createContext, useState, useContext, useEffect } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { authApi } from '../api/authApi';
 import { clearWatchlistCache } from '../components/WatchlistButton';
-import { Alert } from 'react-native';
+import * as AuthSession from 'expo-auth-session';
+import * as WebBrowser from 'expo-web-browser';
+import { Linking } from 'react-native';
+import { CONFIG } from '../constants/config';
+
+WebBrowser.maybeCompleteAuthSession();
 
 export const AuthContext = createContext<any>(null);
 
@@ -11,7 +16,26 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    checkToken();
+    const restoreSession = async () => {
+      try {
+        const initialUrl = await Linking.getInitialURL();
+        if (initialUrl && await completeGoogleCallback(initialUrl)) {
+          setLoading(false);
+          return;
+        }
+      } catch {
+        // Fall through and restore any session already saved on the device.
+      }
+      await checkToken();
+    };
+
+    restoreSession();
+
+    const subscription = Linking.addEventListener('url', ({ url }) => {
+      completeGoogleCallback(url);
+    });
+
+    return () => subscription.remove();
   }, []);
 
   const checkToken = async () => {
@@ -53,12 +77,56 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     }
   };
 
-  const googleLogin = async (idToken: string) => {
+  const saveAuthenticatedSession = async (token: string) => {
+    await AsyncStorage.setItem('@auth_token', token);
+    const data = await authApi.getProfile();
+    clearWatchlistCache();
+    setUser(data.user);
+  };
+
+  const completeGoogleCallback = async (url: string) => {
     try {
-      const data = await authApi.googleLogin(idToken);
-      await AsyncStorage.setItem('@auth_token', data.token);
-      clearWatchlistCache();
-      setUser(data.user);
+      const callbackUrl = new URL(url);
+      const isNativeAuthCallback = callbackUrl.protocol === 'ntnmovie:' &&
+        (callbackUrl.hostname === 'auth' || callbackUrl.pathname === '/auth');
+      const isAuthCallback = isNativeAuthCallback ||
+        (callbackUrl.protocol === 'exp:' && callbackUrl.pathname.endsWith('/--/auth'));
+      const token = callbackUrl.searchParams.get('token');
+
+      if (!isAuthCallback || !token) return false;
+
+      await saveAuthenticatedSession(token);
+      return true;
+    } catch {
+      return false;
+    }
+  };
+
+  const googleLogin = async () => {
+    try {
+      const redirectUri = AuthSession.makeRedirectUri({
+        scheme: 'ntnmovie',
+        path: 'auth',
+      });
+      const authUrl = `${CONFIG.API_BASE_URL}/api/auth/google/mobile?return_uri=${encodeURIComponent(redirectUri)}`;
+      const result = await WebBrowser.openAuthSessionAsync(authUrl, redirectUri);
+
+      if (result.type !== 'success' || !result.url) {
+        return { success: false, cancelled: true };
+      }
+
+      const callbackUrl = new URL(result.url);
+      const error = callbackUrl.searchParams.get('error');
+      if (error) {
+        return { success: false, error: `Google login failed: ${error}` };
+      }
+
+      const token = callbackUrl.searchParams.get('token');
+      if (!token) {
+        return { success: false, error: 'No login token was returned by the server' };
+      }
+
+      await saveAuthenticatedSession(token);
       return { success: true };
     } catch (err: any) {
       const msg = err.response?.data?.message || 'Google login error with server';

@@ -29,9 +29,6 @@
       },
       "predictiveBackGestureEnabled": false
     },
-    "web": {
-      "favicon": "./assets/favicon.png"
-    },
     "extra": {
       "eas": {
         "projectId": "f88f7920-d54d-4f69-b06f-f97afbddf527"
@@ -44,12 +41,6 @@
       "url": "https://u.expo.dev/f88f7920-d54d-4f69-b06f-f97afbddf527"
     },
     "plugins": [
-      [
-        "@react-native-google-signin/google-signin",
-        {
-          "iosUrlScheme": "com.googleusercontent.apps.422000844327-42vnq39198pauu6dnecmuccl3kgl0sub"
-        }
-      ],
       "expo-font"
     ],
     "owner": "ngthnhan"

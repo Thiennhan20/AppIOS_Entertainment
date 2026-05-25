@@ -5,8 +5,6 @@ import { useAuth } from '../../context/AuthContext';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
-import { CONFIG } from '../../constants/config';
-// import { GoogleSignin, statusCodes } from '@react-native-google-signin/google-signin';
 
 export default function LoginScreen({ navigation }: any) {
   const { t } = useTranslation();
@@ -18,45 +16,15 @@ export default function LoginScreen({ navigation }: any) {
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
 
-  // Google Auth Logic Config (Tạm ẩn vì cần Native Build)
-  /*
-  React.useEffect(() => {
-    GoogleSignin.configure({
-      webClientId: CONFIG.GOOGLE_CLIENT_ID_WEB,
-      iosClientId: CONFIG.GOOGLE_CLIENT_ID_IOS,
-      offlineAccess: true,
-    });
-  }, []);
-
   const handleGoogleLogin = async () => {
-    try {
-      await GoogleSignin.hasPlayServices();
-      const userInfo: any = await GoogleSignin.signIn();
-      const idToken = userInfo.data?.idToken || userInfo.idToken; // handle both v10 and older versions
-      
-      if (idToken) {
-        setLoading(true);
-        const res: any = await googleLogin(idToken);
-        setLoading(false);
-        if (!res.success) {
-           Alert.alert('Google Log In failed', res.error);
-        }
-      } else {
-        Alert.alert('Error', t('auth.no_google_session'));
-      }
-    } catch (error: any) {
-      if (error.code === statusCodes.SIGN_IN_CANCELLED) {
-        // user cancelled
-      } else if (error.code === statusCodes.IN_PROGRESS) {
-        // already in progress
-      } else if (error.code === statusCodes.PLAY_SERVICES_NOT_AVAILABLE) {
-        Alert.alert('Error', t('auth.no_play_services'));
-      } else {
-        Alert.alert(t('auth.google_auth_error'), error.message || t('auth.error_occurred'));
-      }
+    setLoading(true);
+    const result = await googleLogin();
+    setLoading(false);
+
+    if (!result.success && !result.cancelled) {
+      Alert.alert(t('auth.google_login_failed'), result.error);
     }
   };
-  */
 
   const handleLogin = async () => {
     if (!email || !password) {
@@ -140,9 +108,9 @@ export default function LoginScreen({ navigation }: any) {
           </View>
 
           <TouchableOpacity 
-            style={[styles.googleButton, { opacity: 0.5 }]} 
-            disabled={true}
-            onPress={() => {}}
+            style={[styles.googleButton, loading && { opacity: 0.5 }]}
+            disabled={loading}
+            onPress={handleGoogleLogin}
           >
             <Ionicons name="logo-google" size={20} color="#fff" />
             <Text style={styles.googleButtonText}>{t('auth.continue_with_google')}</Text>

@@ -149,6 +149,9 @@ EXPO_PUBLIC_TMDB_API_KEY=your_tmdb_api_key_here
 EXPO_PUBLIC_ANTHROPIC_API_KEY=your_anthropic_api_key_here
 ```
 
+Google login is initiated through the backend at `EXPO_PUBLIC_API_BASE_URL`.
+Do not place a Google client secret in this app bundle.
+
 ### Development (Local Server)
 
 ```bash

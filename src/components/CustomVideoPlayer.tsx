@@ -33,6 +33,9 @@ interface CustomVideoPlayerProps {
   // Watch Party flags
   isWatchPartyViewOnly?: boolean; // For viewers when sync is locked
   watchPartyWaitingReason?: string | null;
+
+  /** Callback fired when video playback reaches the end */
+  onVideoEnded?: () => void;
 }
 
 export interface CustomVideoPlayerRef {
@@ -45,7 +48,8 @@ const CustomVideoPlayer = forwardRef<CustomVideoPlayerRef, CustomVideoPlayerProp
   url, isFullscreen, onToggleFullscreen, themeColor,
   movieId, server, audio, isTVShow, season, episode, title, poster,
   onLocalPlay, onLocalPause, onLocalSeek, onLocalSyncPosition,
-  onLocalBuffering, onLocalBufferEnd, isWatchPartyViewOnly, watchPartyWaitingReason
+  onLocalBuffering, onLocalBufferEnd, isWatchPartyViewOnly, watchPartyWaitingReason,
+  onVideoEnded
 }, ref) => {
   const { t } = useTranslation();
   const [showControls, setShowControls] = useState(true);
@@ -93,8 +97,13 @@ const CustomVideoPlayer = forwardRef<CustomVideoPlayerRef, CustomVideoPlayerProp
   const hasEverPlayedRef = useRef(false);
   const seekDebounceRef = useRef<NodeJS.Timeout | null>(null);
 
+  // Video ended detection ref
+  const videoEndedFiredRef = useRef(false);
 
-
+  // Reset ended flag when URL changes (new episode)
+  useEffect(() => {
+    videoEndedFiredRef.current = false;
+  }, [url]);
   const player = useVideoPlayer(url, p => {
     p.loop = false;
     // Don't auto-play until resume check is done
@@ -248,6 +257,10 @@ const CustomVideoPlayer = forwardRef<CustomVideoPlayerRef, CustomVideoPlayerProp
         if (player.playing && !isSeekingRef.current && lastPolledTimeRef.current !== -1) {
           const diff = newTime - lastPolledTimeRef.current;
           const isAtEnd = player.duration > 0 && Math.abs(player.duration - newTime) < 0.5;
+          if (isAtEnd && !videoEndedFiredRef.current) {
+            videoEndedFiredRef.current = true;
+            onVideoEnded?.();
+          }
           if (diff >= 0 && diff < 0.05 && !isAtEnd) { 
              if (!isBufferingRef.current) {
                isBufferingRef.current = true;
