@@ -7,9 +7,9 @@ import * as Sharing from 'expo-sharing';
 import { versionApi } from '../api/versionApi';
 
 const EAS_PROJECT_ID = 'f88f7920-d54d-4f69-b06f-f97afbddf527';
-const EAS_MAIN_BRANCH_ID = '019d0cc8-6a09-70ff-b66a-a5647482098b';
+const EAS_EXPO_GO_GROUP_ID = 'dd54f627-ce63-4fad-9cb6-6bdebed09624';
 const EAS_UPDATE_QR_URL =
-  `https://qr.expo.dev/eas-update?projectId=${EAS_PROJECT_ID}&branchId=${EAS_MAIN_BRANCH_ID}`;
+  `https://qr.expo.dev/eas-update?projectId=${EAS_PROJECT_ID}&groupId=${EAS_EXPO_GO_GROUP_ID}`;
 
 interface VersionInfo {
   hash: string;
