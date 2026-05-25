@@ -1,9 +1,9 @@
-import React, { useEffect, useState, useCallback } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Modal, AppState, AppStateStatus, ScrollView } from 'react-native';
+import React, { useEffect, useState, useCallback, useRef } from 'react';
+import { Alert, AppState, AppStateStatus, BackHandler, Modal, Platform, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Image } from 'expo-image';
-import { File, Paths } from 'expo-file-system';
-import * as Sharing from 'expo-sharing';
+import * as MediaLibrary from 'expo-media-library';
+import { captureRef } from 'react-native-view-shot';
 import { versionApi } from '../api/versionApi';
 
 const EAS_PROJECT_ID = 'f88f7920-d54d-4f69-b06f-f97afbddf527';
@@ -22,6 +22,8 @@ export default function VersionChecker() {
   const [showModal, setShowModal] = useState(false);
   const [isDownloadingQr, setIsDownloadingQr] = useState(false);
   const [qrDownloadMessage, setQrDownloadMessage] = useState<string | null>(null);
+  const [isQrReady, setIsQrReady] = useState(false);
+  const qrCaptureRef = useRef<View | null>(null);
 
   const checkVersion = useCallback(async () => {
     try {
@@ -72,7 +74,18 @@ export default function VersionChecker() {
     if (serverVersion) {
       await AsyncStorage.setItem('notified_hash', serverVersion.hash);
     }
-    // Cứ để modal hiện chặn ở đó, bắt buộc user phải tắt app mở lại.
+
+    setShowModal(false);
+
+    if (Platform.OS === 'android') {
+      setTimeout(() => BackHandler.exitApp(), 100);
+      return;
+    }
+
+    Alert.alert(
+      'Đóng ứng dụng để cập nhật',
+      'iPhone không cho phép ứng dụng tự đóng. Hãy vuốt đóng Expo Go, sau đó quét mã QR đã lưu.'
+    );
   };
 
   const handleDownloadQr = async () => {
@@ -80,22 +93,25 @@ export default function VersionChecker() {
     setQrDownloadMessage(null);
 
     try {
-      const canShare = await Sharing.isAvailableAsync();
-      if (!canShare) {
-        setQrDownloadMessage('Thiết bị này không hỗ trợ lưu hoặc chia sẻ mã QR.');
+      if (!qrCaptureRef.current || !isQrReady) {
+        setQrDownloadMessage('Mã QR chưa tải xong. Vui lòng thử lại sau vài giây.');
         return;
       }
 
-      const qrFile = new File(Paths.cache, 'ntn-update-qr.svg');
-      const downloadedQr = await File.downloadFileAsync(EAS_UPDATE_QR_URL, qrFile, {
-        idempotent: true,
+      const permission = await MediaLibrary.requestPermissionsAsync(true);
+      if (!permission.granted) {
+        setQrDownloadMessage('Cần cấp quyền lưu ảnh để tải mã QR về máy.');
+        return;
+      }
+
+      const qrImageUri = await captureRef(qrCaptureRef, {
+        format: 'png',
+        quality: 1,
+        result: 'tmpfile',
       });
 
-      await Sharing.shareAsync(downloadedQr.uri, {
-        dialogTitle: 'Lưu mã QR cập nhật NTN',
-        mimeType: 'image/svg+xml',
-      });
-      setQrDownloadMessage('Đã mở tuỳ chọn lưu hoặc chia sẻ mã QR.');
+      await MediaLibrary.saveToLibraryAsync(qrImageUri);
+      setQrDownloadMessage('Đã lưu mã QR vào thư viện ảnh.');
     } catch {
       setQrDownloadMessage('Không thể tải mã QR. Vui lòng thử lại.');
     } finally {
@@ -146,24 +162,31 @@ export default function VersionChecker() {
             )}
 
             <View style={styles.qrContainer}>
-              <Image
-                contentFit="contain"
-                source={{ uri: EAS_UPDATE_QR_URL }}
-                style={styles.qrImage}
-                transition={180}
-              />
+              <View ref={qrCaptureRef} collapsable={false} style={styles.qrImageFrame}>
+                <Image
+                  contentFit="contain"
+                  source={{ uri: EAS_UPDATE_QR_URL }}
+                  style={styles.qrImage}
+                  transition={180}
+                  onLoad={() => setIsQrReady(true)}
+                  onError={() => setIsQrReady(false)}
+                />
+              </View>
               <Text style={styles.qrTitle}>Quét mã QR nếu app chưa cập nhật</Text>
               <Text style={styles.qrDescription}>
                 Lưu ý: trước khi quét QR, hãy xoá bản app_ios cũ trong Expo Go nếu đang lưu.
               </Text>
               <TouchableOpacity
-                style={styles.downloadQrBtn}
+                style={[
+                  styles.downloadQrBtn,
+                  (isDownloadingQr || !isQrReady) && styles.downloadQrBtnDisabled,
+                ]}
                 onPress={handleDownloadQr}
                 activeOpacity={0.82}
-                disabled={isDownloadingQr}
+                disabled={isDownloadingQr || !isQrReady}
               >
                 <Text style={styles.downloadQrText}>
-                  {isDownloadingQr ? 'Đang chuẩn bị mã QR...' : 'Tải mã QR về máy'}
+                  {!isQrReady ? 'Đang tải mã QR...' : isDownloadingQr ? 'Đang lưu mã QR...' : 'Tải mã QR về máy'}
                 </Text>
               </TouchableOpacity>
               {qrDownloadMessage && (
@@ -176,7 +199,9 @@ export default function VersionChecker() {
               onPress={handleUpdate}
               activeOpacity={0.8}
             >
-              <Text style={styles.primaryBtnText}>Đã hiểu, tôi sẽ đóng app và quét QR</Text>
+              <Text style={styles.primaryBtnText}>
+                {Platform.OS === 'android' ? 'Đã hiểu, đóng app và quét QR' : 'Đã hiểu, ẩn thông báo và quét QR'}
+              </Text>
             </TouchableOpacity>
 
             <Text style={styles.hint}>
@@ -309,12 +334,17 @@ const styles = StyleSheet.create({
     padding: 12,
     marginBottom: 18,
   },
-  qrImage: {
+  qrImageFrame: {
     width: 148,
     height: 148,
     backgroundColor: '#fff',
     borderRadius: 10,
     marginBottom: 10,
+    overflow: 'hidden',
+  },
+  qrImage: {
+    width: '100%',
+    height: '100%',
   },
   qrTitle: {
     color: '#f3f4f6',
@@ -336,6 +366,9 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: 'rgba(239,68,68,0.55)',
     backgroundColor: 'rgba(239,68,68,0.12)',
+  },
+  downloadQrBtnDisabled: {
+    opacity: 0.5,
   },
   downloadQrText: {
     color: '#f87171',
