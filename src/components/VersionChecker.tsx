@@ -7,7 +7,7 @@ import { versionApi } from '../api/versionApi';
 const EAS_PROJECT_ID = 'f88f7920-d54d-4f69-b06f-f97afbddf527';
 const EAS_MAIN_BRANCH_ID = '019d0cc8-6a09-70ff-b66a-a5647482098b';
 const EAS_UPDATE_QR_URL =
-  `https://qr.expo.dev/eas-update?projectId=${EAS_PROJECT_ID}&branchId=${EAS_MAIN_BRANCH_ID}&slug=app_ios`;
+  `https://qr.expo.dev/eas-update?projectId=${EAS_PROJECT_ID}&branchId=${EAS_MAIN_BRANCH_ID}`;
 
 interface VersionInfo {
   hash: string;
@@ -120,9 +120,9 @@ export default function VersionChecker() {
                 style={styles.qrImage}
                 transition={180}
               />
-              <Text style={styles.qrTitle}>Quét bằng NTN Development Build</Text>
+              <Text style={styles.qrTitle}>Quét bằng Expo Go (SDK 54)</Text>
               <Text style={styles.qrDescription}>
-                Mã này mở bản cập nhật mới nhất của nhánh main trên app development.
+                Mã này mở bản cập nhật mới nhất của nhánh main trực tiếp trong Expo Go.
               </Text>
             </View>
 
@@ -135,7 +135,7 @@ export default function VersionChecker() {
             </TouchableOpacity>
 
             <Text style={styles.hint}>
-              EAS Update có runtimeVersion cần mở bằng development build, không phải Expo Go.
+              Hãy dùng Expo Go hỗ trợ SDK 54 và kết nối mạng ổn định để tải bản cập nhật.
             </Text>
           </ScrollView>
         </View>

@@ -41,7 +41,8 @@
       "url": "https://u.expo.dev/f88f7920-d54d-4f69-b06f-f97afbddf527"
     },
     "plugins": [
-      "expo-font"
+      "expo-font",
+      "expo-web-browser"
     ],
     "owner": "ngthnhan"
   }
