@@ -41,6 +41,9 @@
       "expo-font",
       "expo-web-browser"
     ],
-    "owner": "ngthnhan"
+    "owner": "ngthnhan",
+    "runtimeVersion": {
+      "policy": "appVersion"
+    }
   }
 }

@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useCallback, useRef } from 'react';
-import { Alert, AppState, AppStateStatus, BackHandler, Modal, Platform, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Alert, AppState, AppStateStatus, BackHandler, Modal, Platform, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Image } from 'expo-image';
 import * as MediaLibrary from 'expo-media-library';
@@ -17,10 +17,12 @@ interface VersionInfo {
   date: number; // Unix timestamp
 }
 
+type QrDownloadStatus = 'idle' | 'loading' | 'success' | 'error';
+
 export default function VersionChecker() {
   const [serverVersion, setServerVersion] = useState<VersionInfo | null>(null);
   const [showModal, setShowModal] = useState(false);
-  const [isDownloadingQr, setIsDownloadingQr] = useState(false);
+  const [qrDownloadStatus, setQrDownloadStatus] = useState<QrDownloadStatus>('idle');
   const [qrDownloadMessage, setQrDownloadMessage] = useState<string | null>(null);
   const [isQrReady, setIsQrReady] = useState(false);
   const qrCaptureRef = useRef<View | null>(null);
@@ -50,6 +52,8 @@ export default function VersionChecker() {
         message: commitMessage,
         date: new Date(latestVersion.createdAt).getTime()
       });
+      setQrDownloadStatus('idle');
+      setQrDownloadMessage(null);
       setShowModal(true);
     } catch {
       // Fail silently
@@ -89,17 +93,19 @@ export default function VersionChecker() {
   };
 
   const handleDownloadQr = async () => {
-    setIsDownloadingQr(true);
+    setQrDownloadStatus('loading');
     setQrDownloadMessage(null);
 
     try {
       if (!qrCaptureRef.current || !isQrReady) {
+        setQrDownloadStatus('error');
         setQrDownloadMessage('Mã QR chưa tải xong. Vui lòng thử lại sau vài giây.');
         return;
       }
 
       const permission = await MediaLibrary.requestPermissionsAsync(true);
       if (!permission.granted) {
+        setQrDownloadStatus('error');
         setQrDownloadMessage('Cần cấp quyền lưu ảnh để tải mã QR về máy.');
         return;
       }
@@ -111,11 +117,11 @@ export default function VersionChecker() {
       });
 
       await MediaLibrary.saveToLibraryAsync(qrImageUri);
+      setQrDownloadStatus('success');
       setQrDownloadMessage('Đã lưu mã QR vào thư viện ảnh.');
     } catch {
+      setQrDownloadStatus('error');
       setQrDownloadMessage('Không thể tải mã QR. Vui lòng thử lại.');
-    } finally {
-      setIsDownloadingQr(false);
     }
   };
 
@@ -179,18 +185,40 @@ export default function VersionChecker() {
               <TouchableOpacity
                 style={[
                   styles.downloadQrBtn,
-                  (isDownloadingQr || !isQrReady) && styles.downloadQrBtnDisabled,
+                  qrDownloadStatus === 'loading' && styles.downloadQrBtnLoading,
+                  qrDownloadStatus === 'success' && styles.downloadQrBtnSuccess,
+                  qrDownloadStatus === 'error' && styles.downloadQrBtnError,
                 ]}
                 onPress={handleDownloadQr}
                 activeOpacity={0.82}
-                disabled={isDownloadingQr || !isQrReady}
+                disabled={qrDownloadStatus === 'loading'}
               >
+                {qrDownloadStatus === 'loading' && (
+                  <ActivityIndicator size="small" color="#ffffff" style={styles.downloadQrSpinner} />
+                )}
                 <Text style={styles.downloadQrText}>
-                  {!isQrReady ? 'Đang tải mã QR...' : isDownloadingQr ? 'Đang lưu mã QR...' : 'Tải mã QR về máy'}
+                  {qrDownloadStatus === 'loading' ? 'Đang lưu mã QR...' : 'Tải mã QR về máy'}
                 </Text>
               </TouchableOpacity>
               {qrDownloadMessage && (
-                <Text style={styles.downloadQrMessage}>{qrDownloadMessage}</Text>
+                <View style={styles.downloadQrMessageRow}>
+                  <Text
+                    style={[
+                      styles.downloadQrMessageIcon,
+                      qrDownloadStatus === 'success' ? styles.downloadQrSuccessText : styles.downloadQrErrorText,
+                    ]}
+                  >
+                    {qrDownloadStatus === 'success' ? '\u2713' : 'X'}
+                  </Text>
+                  <Text
+                    style={[
+                      styles.downloadQrMessage,
+                      qrDownloadStatus === 'success' ? styles.downloadQrSuccessText : styles.downloadQrErrorText,
+                    ]}
+                  >
+                    {qrDownloadMessage}
+                  </Text>
+                </View>
               )}
             </View>
 
@@ -364,23 +392,52 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     borderRadius: 10,
     borderWidth: 1,
-    borderColor: 'rgba(239,68,68,0.55)',
-    backgroundColor: 'rgba(239,68,68,0.12)',
+    borderColor: 'rgba(255,255,255,0.1)',
+    backgroundColor: '#111827',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  downloadQrBtnDisabled: {
-    opacity: 0.5,
+  downloadQrBtnLoading: {
+    backgroundColor: '#1f2937',
+  },
+  downloadQrBtnSuccess: {
+    borderColor: '#22c55e',
+    backgroundColor: '#16a34a',
+  },
+  downloadQrBtnError: {
+    borderColor: '#ef4444',
+    backgroundColor: '#dc2626',
   },
   downloadQrText: {
-    color: '#f87171',
+    color: '#ffffff',
     fontSize: 12,
     fontWeight: '700',
   },
-  downloadQrMessage: {
+  downloadQrSpinner: {
+    marginRight: 8,
+  },
+  downloadQrMessageRow: {
     marginTop: 8,
-    color: '#9ca3af',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  downloadQrMessageIcon: {
+    fontSize: 12,
+    fontWeight: '800',
+    marginRight: 5,
+  },
+  downloadQrMessage: {
     fontSize: 11,
     textAlign: 'center',
     lineHeight: 16,
+  },
+  downloadQrSuccessText: {
+    color: '#22c55e',
+  },
+  downloadQrErrorText: {
+    color: '#ef4444',
   },
   primaryBtn: {
     width: '100%',
