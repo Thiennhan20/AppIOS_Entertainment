@@ -9,7 +9,7 @@ import { versionApi } from '../api/versionApi';
 const EAS_PROJECT_ID = 'f88f7920-d54d-4f69-b06f-f97afbddf527';
 const EAS_MAIN_BRANCH_ID = '019d0cc8-6a09-70ff-b66a-a5647482098b';
 const EAS_UPDATE_QR_URL =
-  `https://qr.expo.dev/eas-update?projectId=${EAS_PROJECT_ID}&branchId=${EAS_MAIN_BRANCH_ID}&slug=app_ios`;
+  `https://qr.expo.dev/eas-update?projectId=${EAS_PROJECT_ID}&branchId=${EAS_MAIN_BRANCH_ID}`;
 
 interface VersionInfo {
   hash: string;
@@ -154,7 +154,7 @@ export default function VersionChecker() {
               />
               <Text style={styles.qrTitle}>Quét mã QR nếu app chưa cập nhật</Text>
               <Text style={styles.qrDescription}>
-                Lưu ý: trước khi quét, hãy xoá bản app_ios cũ trong NTN Development Build nếu đang lưu.
+                Lưu ý: trước khi quét QR, hãy xoá bản app_ios cũ trong Expo Go nếu đang lưu.
               </Text>
               <TouchableOpacity
                 style={styles.downloadQrBtn}
@@ -180,7 +180,7 @@ export default function VersionChecker() {
             </TouchableOpacity>
 
             <Text style={styles.hint}>
-              Expo Go không mở được bản cập nhật dùng runtime riêng của ứng dụng. Hãy cài NTN Development Build rồi quét mã.
+              Hãy dùng Expo Go hỗ trợ SDK 54 và kết nối mạng ổn định để tải bản cập nhật.
             </Text>
           </ScrollView>
         </View>
