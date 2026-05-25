@@ -20,6 +20,8 @@ import { roomApi } from '../../api/roomApi';
 import LongPressMoviePopup from '../../components/LongPressMoviePopup';
 import WatchlistButton from '../../components/WatchlistButton';
 import ScrollToTopButton from '../../components/ScrollToTopButton';
+import NotificationBell from '../../components/NotificationBell';
+import useScrollToTop from '../../hooks/useScrollToTop';
 
 // ─── Local imports ───────────────────────────────────────────────────────────
 import { styles } from './homeStyles';
@@ -80,13 +82,7 @@ export default function HomeScreen({ navigation }: any) {
   const [recentComments, setRecentComments] = useState<any[]>([]);
 
   const flatListRef = React.useRef<FlatList>(null);
-  const [showScrollTop, setShowScrollTop] = useState(false);
-
-  const handleScroll = (event: any) => {
-    const offsetY = event.nativeEvent.contentOffset.y;
-    if (offsetY > 300 && !showScrollTop) setShowScrollTop(true);
-    if (offsetY <= 300 && showScrollTop) setShowScrollTop(false);
-  };
+  const { handleScroll, showScrollTop } = useScrollToTop();
 
   const [loading,        setLoading]        = useState(true);
   const [refreshing,     setRefreshing]     = useState(false);
@@ -561,6 +557,7 @@ export default function HomeScreen({ navigation }: any) {
           <Ionicons name="search" size={18} color="#CCC" />
           <Text style={styles.searchText}>{t('home.search_movies')}</Text>
         </TouchableOpacity>
+        <NotificationBell navigation={navigation} />
         <TouchableOpacity
           style={styles.menuBtn}
           onPress={() => setMenuVisible(true)}
@@ -642,7 +639,6 @@ export default function HomeScreen({ navigation }: any) {
       <ScrollToTopButton 
         visible={showScrollTop} 
         onPress={() => flatListRef.current?.scrollToOffset({ offset: 0, animated: true })}
-        bottomOffset={85} 
       />
 
     </View>

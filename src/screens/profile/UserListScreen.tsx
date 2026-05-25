@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useRef } from 'react';
 import { View, Text, StyleSheet, FlatList, TouchableOpacity, ActivityIndicator, Alert, Vibration } from 'react-native';
 import { Image } from 'expo-image';
 import { useFocusEffect } from '@react-navigation/native';
@@ -7,6 +7,8 @@ import { Ionicons } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
 import { authApi } from '../../api/authApi';
 import LongPressMoviePopup from '../../components/LongPressMoviePopup';
+import ScrollToTopButton from '../../components/ScrollToTopButton';
+import useScrollToTop from '../../hooks/useScrollToTop';
 
 export default function UserListScreen({ route, navigation }: any) {
   const insets = useSafeAreaInsets();
@@ -15,6 +17,8 @@ export default function UserListScreen({ route, navigation }: any) {
   const [data, setData] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [longPressedMovie, setLongPressedMovie] = useState<any>(null);
+  const scrollRef = useRef<FlatList>(null);
+  const { handleScroll, showScrollTop } = useScrollToTop();
 
   const title = type === 'watchlist' ? 'Watchlist' : 'Watch History';
 
@@ -111,7 +115,10 @@ export default function UserListScreen({ route, navigation }: any) {
         </View>
       ) : (
         <FlatList
+          ref={scrollRef}
           data={data}
+          onScroll={handleScroll}
+          scrollEventThrottle={16}
           keyExtractor={(item, index) => `${item.id || item.contentId}-${index}`}
           numColumns={3}
           contentContainerStyle={styles.listContent}
@@ -127,6 +134,11 @@ export default function UserListScreen({ route, navigation }: any) {
         movie={longPressedMovie} 
         onClose={() => setLongPressedMovie(null)} 
         onWatchlistUpdated={fetchData}
+      />
+
+      <ScrollToTopButton
+        onPress={() => scrollRef.current?.scrollToOffset({ animated: true, offset: 0 })}
+        visible={showScrollTop}
       />
     </View>
   );

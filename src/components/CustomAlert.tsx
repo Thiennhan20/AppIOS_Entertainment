@@ -24,16 +24,19 @@ export default function CustomAlert({
   message,
   onClose,
   onConfirm,
-  confirmText = 'OK',
-  cancelText = 'Cancel',
+  confirmText,
+  cancelText,
   iconName,
   isError = false,
 }: CustomAlertProps) {
+  const { t } = useTranslation();
   const { themeColor } = useTheme();
 
   const mainColor = isError ? '#E50914' : themeColor;
   const defaultIcon = isError ? 'alert-circle-outline' : 'information-circle-outline';
   const finalIcon = iconName || defaultIcon;
+  const confirmLabel = confirmText || t('general.close');
+  const cancelLabel = cancelText || t('general.cancel');
 
   return (
     <Modal
@@ -63,7 +66,7 @@ export default function CustomAlert({
                     onPress={onClose}
                   >
                     <Text style={[styles.modalCancelBtnText, { color: themeColor }]}>
-                      {cancelText}
+                      {cancelLabel}
                     </Text>
                   </TouchableOpacity>
                 )}
@@ -73,7 +76,7 @@ export default function CustomAlert({
                   onPress={onConfirm ? onConfirm : onClose}
                 >
                   <Text style={styles.modalConfirmBtnText}>
-                    {confirmText}
+                    {confirmLabel}
                   </Text>
                 </TouchableOpacity>
               </View>
@@ -94,13 +97,14 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   modalContent: {
-    backgroundColor: '#1E1E1E',
-    width: 300,
-    borderRadius: 12,
-    padding: 20,
+    backgroundColor: '#14161C',
+    width: '86%',
+    maxWidth: 360,
+    borderRadius: 22,
+    padding: 22,
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: '#333',
+    borderColor: '#272B35',
     elevation: 10,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 5 },
@@ -121,7 +125,7 @@ const styles = StyleSheet.create({
     marginLeft: 8,
   },
   modalMessage: {
-    color: '#aaa',
+    color: '#B3B8C4',
     fontSize: 14,
     textAlign: 'center',
     marginBottom: 10,
@@ -135,8 +139,8 @@ const styles = StyleSheet.create({
   modalCancelBtn: {
     flex: 1,
     height: 40,
-    backgroundColor: '#333',
-    borderRadius: 8,
+    backgroundColor: '#1C2028',
+    borderRadius: 12,
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 8,
@@ -149,7 +153,7 @@ const styles = StyleSheet.create({
   modalConfirmBtn: {
     flex: 1,
     height: 40,
-    borderRadius: 8,
+    borderRadius: 12,
     justifyContent: 'center',
     alignItems: 'center',
   },

@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { 
   StyleSheet, Text, View, TextInput, TouchableOpacity, 
-  KeyboardAvoidingView, Platform, Animated, Easing, ActivityIndicator, Image
+  KeyboardAvoidingView, Platform, Animated, Easing, ActivityIndicator, Image, ScrollView
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -10,12 +10,16 @@ import { useTranslation } from 'react-i18next';
 import { useAuth } from '../../context/AuthContext';
 import { useTheme } from '../../context/ThemeContext';
 import CustomAlert from '../../components/CustomAlert';
+import ScrollToTopButton from '../../components/ScrollToTopButton';
+import useScrollToTop from '../../hooks/useScrollToTop';
 
 export default function SettingsScreen({ navigation }: any) {
   const { t } = useTranslation();
   const insets = useSafeAreaInsets();
   const { user, updateProfile } = useAuth();
   const { themeColor } = useTheme();
+  const scrollRef = useRef<ScrollView>(null);
+  const { handleScroll, showScrollTop } = useScrollToTop();
 
   const [name, setName] = useState(user?.name || '');
   const [email, setEmail] = useState(user?.email || '');
@@ -155,6 +159,9 @@ export default function SettingsScreen({ navigation }: any) {
 
       <Animated.ScrollView 
         contentContainerStyle={styles.content}
+        onScroll={handleScroll}
+        ref={scrollRef}
+        scrollEventThrottle={16}
         style={{ opacity: fadeAnim, transform: [{ translateY }] }}
         keyboardShouldPersistTaps="handled"
       >
@@ -212,6 +219,11 @@ export default function SettingsScreen({ navigation }: any) {
           )}
         </TouchableOpacity>
       </View>
+
+      <ScrollToTopButton
+        onPress={() => scrollRef.current?.scrollTo({ animated: true, y: 0 })}
+        visible={showScrollTop}
+      />
 
       <CustomAlert
         visible={alertConfig.visible}

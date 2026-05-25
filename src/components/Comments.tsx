@@ -28,11 +28,12 @@ interface CommentsProps {
   movieId: number | string;
   type: 'movie' | 'tvshow';
   title?: string;
+  onUserPress?: (userId: string) => void;
 }
 
 const COMMENTS_PER_PAGE = 3;
 
-export default function Comments({ movieId, type, title }: CommentsProps) {
+export default function Comments({ movieId, type, title, onUserPress }: CommentsProps) {
   const { user } = useAuth();
   const { showToast } = useToast();
   const isAuthenticated = !!user;
@@ -313,7 +314,12 @@ export default function Comments({ movieId, type, title }: CommentsProps) {
         comments.map((comment) => (
           <View key={comment._id} style={styles.commentItem}>
             <View style={styles.commentHeader}>
-              <View style={styles.commentUserRow}>
+              <TouchableOpacity
+                activeOpacity={onUserPress ? 0.72 : 1}
+                disabled={!onUserPress || !comment.userId?._id}
+                onPress={() => comment.userId?._id && onUserPress?.(comment.userId._id)}
+                style={styles.commentUserRow}
+              >
                 {comment.userId?.avatar ? (
                   <Image source={{ uri: comment.userId.avatar }} style={styles.avatarSmall} contentFit="cover" />
                 ) : (
@@ -325,7 +331,7 @@ export default function Comments({ movieId, type, title }: CommentsProps) {
                   <Text style={styles.commentName}>{comment.userId?.name || 'Unknown User'}</Text>
                   <Text style={styles.commentTime}>{formatTime(comment.createdAt)}</Text>
                 </View>
-              </View>
+              </TouchableOpacity>
               {isAuthenticated && user?.id === comment.userId?._id && (
                 <TouchableOpacity onPress={() => setActionOpenId(actionOpenId === comment._id ? null : comment._id)}>
                   <Ionicons name="ellipsis-horizontal" size={20} color="#9ca3af" />
@@ -411,7 +417,12 @@ export default function Comments({ movieId, type, title }: CommentsProps) {
             {/* Replies items */}
             {showReplies.has(comment._id) && comment.replies && comment.replies.map(reply => (
               <View key={reply._id} style={styles.replyItem}>
-                <View style={styles.commentUserRow}>
+                <TouchableOpacity
+                  activeOpacity={onUserPress ? 0.72 : 1}
+                  disabled={!onUserPress || !reply.userId?._id}
+                  onPress={() => reply.userId?._id && onUserPress?.(reply.userId._id)}
+                  style={styles.commentUserRow}
+                >
                   {reply.userId?.avatar ? (
                     <Image source={{ uri: reply.userId.avatar }} style={styles.avatarTiny} contentFit="cover" />
                   ) : (
@@ -423,7 +434,7 @@ export default function Comments({ movieId, type, title }: CommentsProps) {
                     <Text style={styles.commentNameSmall}>{reply.userId?.name || 'Unknown User'}</Text>
                     <Text style={styles.commentTimeSmall}>{formatTime(reply.createdAt)}</Text>
                   </View>
-                </View>
+                </TouchableOpacity>
                 <Text style={styles.replyContent}>{reply.content}</Text>
                 <View style={styles.commentActions}>
                   <TouchableOpacity style={styles.actionBtn} onPress={() => handleLike(reply._id, true, comment._id)}>

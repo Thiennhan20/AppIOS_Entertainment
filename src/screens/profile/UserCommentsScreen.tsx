@@ -1,10 +1,12 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useRef } from 'react';
 import { View, Text, StyleSheet, FlatList, TouchableOpacity, ActivityIndicator, Alert } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
 import { commentsApi } from '../../api/commentsApi';
+import ScrollToTopButton from '../../components/ScrollToTopButton';
+import useScrollToTop from '../../hooks/useScrollToTop';
 
 export default function UserCommentsScreen({ navigation }: any) {
   const insets = useSafeAreaInsets();
@@ -16,6 +18,8 @@ export default function UserCommentsScreen({ navigation }: any) {
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(true);
   const [activeFilter, setActiveFilter] = useState<'comments' | 'replies' | 'liked'>('comments');
+  const scrollRef = useRef<FlatList>(null);
+  const { handleScroll, showScrollTop } = useScrollToTop();
 
   useFocusEffect(
     useCallback(() => {
@@ -63,18 +67,18 @@ export default function UserCommentsScreen({ navigation }: any) {
   const handleDelete = (commentId: string) => {
     Alert.alert(
       t('general.notice', { defaultValue: 'Notice' }),
-      t('general.delete_confirm', { defaultValue: 'Are you sure you want to delete this comment?' }),
+      t('general.delete_comment_confirm'),
       [
         { text: t('general.cancel', { defaultValue: 'Cancel' }), style: 'cancel' },
         { 
-          text: 'Delete', 
+          text: t('general.delete'),
           style: 'destructive',
           onPress: async () => {
             try {
               await commentsApi.deleteComment(commentId);
               setData(prev => prev.filter(c => c._id !== commentId));
             } catch (error) {
-              Alert.alert('Error', 'Failed to delete comment');
+              Alert.alert(t('general.error'), t('general.delete_comment_failed'));
             }
           }
         }
@@ -86,6 +90,8 @@ export default function UserCommentsScreen({ navigation }: any) {
     const isTV = item.type === 'tvshow';
     const date = new Date(item.createdAt);
     const dateString = `${date.getDate().toString().padStart(2, '0')}/${(date.getMonth()+1).toString().padStart(2, '0')}/${date.getFullYear()}`;
+    const kind = item.parentId ? t('profile.reply_item') : t('profile.comment_item');
+    const media = isTV ? t('friends.tv_show') : t('friends.movie');
 
     return (
       <View style={[
@@ -99,10 +105,7 @@ export default function UserCommentsScreen({ navigation }: any) {
             onPress={() => navigation.navigate('DetailScreen', { item: { id: item.movieId }, isTV })}
           >
             <Text style={[styles.movieLinkText, activeFilter === 'liked' ? {color: '#ef4444'} : {}]}>
-              {activeFilter === 'liked' 
-                ? t('general.view_liked_comment', { defaultValue: `View liked ${item.parentId ? 'reply' : 'comment'} on ${isTV ? 'TV Show' : 'Movie'}` })
-                : t('general.view_comment', { defaultValue: `View ${item.parentId ? 'reply' : 'comment'} on ${isTV ? 'TV Show' : 'Movie'}` })
-              }
+              {t(activeFilter === 'liked' ? 'profile.view_liked_entry' : 'profile.view_entry', { kind, media })}
             </Text>
             <Ionicons name="chevron-forward" size={14} color={activeFilter === 'liked' ? '#ef4444' : '#3b82f6'} />
           </TouchableOpacity>
@@ -116,7 +119,7 @@ export default function UserCommentsScreen({ navigation }: any) {
 
         {item.parentId && (
           <View style={[styles.replyBadge, activeFilter === 'liked' ? {backgroundColor: 'rgba(239, 68, 68, 0.1)'} : {backgroundColor: 'rgba(99, 102, 241, 0.1)'}]}>
-            <Text style={[styles.replyBadgeText, activeFilter === 'liked' ? {color: '#fca5a5'} : {color: '#a5b4fc'}]}>Reply</Text>
+            <Text style={[styles.replyBadgeText, activeFilter === 'liked' ? {color: '#fca5a5'} : {color: '#a5b4fc'}]}>{t('profile.reply_item')}</Text>
           </View>
         )}
 
@@ -124,7 +127,7 @@ export default function UserCommentsScreen({ navigation }: any) {
 
         {item.likes > 0 && (
           <View style={styles.likesContainer}>
-            <Text style={styles.likesText}>❤️ {item.likes} {item.likes === 1 ? 'like' : 'likes'}</Text>
+            <Text style={styles.likesText}>{t('profile.likes_count', { count: item.likes })}</Text>
           </View>
         )}
       </View>
@@ -137,14 +140,14 @@ export default function UserCommentsScreen({ navigation }: any) {
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
           <Ionicons name="arrow-back" size={24} color="white" />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>{t('profile.my_comments', { defaultValue: 'My Comments' })}</Text>
+        <Text style={styles.headerTitle}>{t('profile.my_comments')}</Text>
       </View>
 
       <View style={styles.filterContainer}>
         {[
-          { id: 'comments', label: 'Comments' },
-          { id: 'replies', label: 'Replies' },
-          { id: 'liked', label: 'Liked' }
+          { id: 'comments', label: t('profile.comments_tab') },
+          { id: 'replies', label: t('profile.replies_tab') },
+          { id: 'liked', label: t('profile.liked_tab') }
         ].map((tab) => (
           <TouchableOpacity
             key={tab.id}
@@ -165,11 +168,14 @@ export default function UserCommentsScreen({ navigation }: any) {
       ) : data.length === 0 ? (
         <View style={styles.emptyContainer}>
           <Ionicons name="chatbubble-ellipses-outline" size={60} color="#333" />
-          <Text style={styles.emptyText}>{t('profile.no_comments_yet', { defaultValue: 'You haven\'t posted any comments yet' })}</Text>
+          <Text style={styles.emptyText}>{t('profile.no_comments_yet')}</Text>
         </View>
       ) : (
         <FlatList
+          ref={scrollRef}
           data={data}
+          onScroll={handleScroll}
+          scrollEventThrottle={16}
           keyExtractor={(item) => item._id}
           renderItem={renderItem}
           contentContainerStyle={styles.listContent}
@@ -184,6 +190,11 @@ export default function UserCommentsScreen({ navigation }: any) {
           }
         />
       )}
+
+      <ScrollToTopButton
+        onPress={() => scrollRef.current?.scrollToOffset({ animated: true, offset: 0 })}
+        visible={showScrollTop}
+      />
     </View>
   );
 }

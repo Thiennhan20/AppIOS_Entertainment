@@ -54,12 +54,15 @@ import SettingsScreen from './src/screens/profile/SettingsScreen';
 import HelpScreen from './src/screens/profile/HelpScreen';
 import UserListScreen from './src/screens/profile/UserListScreen';
 import UserCommentsScreen from './src/screens/profile/UserCommentsScreen';
+import FriendsScreen from './src/screens/profile/FriendsScreen';
+import PublicProfileScreen from './src/screens/profile/PublicProfileScreen';
 
 import LoginScreen from './src/screens/auth/LoginScreen';
 import RegisterScreen from './src/screens/auth/RegisterScreen';
 import ForgotPasswordScreen from './src/screens/auth/ForgotPasswordScreen';
 
 import { AnimatedTabBar } from './src/components/AnimatedTabBar';
+import CinematicEntryTransition from './src/components/CinematicEntryTransition';
 import VersionChecker from './src/components/VersionChecker';
 
 const Stack = createNativeStackNavigator();
@@ -81,23 +84,28 @@ function HomeStack() {
       <Stack.Screen name="DetailScreen" component={DetailScreen} />
       <Stack.Screen name="PlayerScreen" component={PlayerScreen} />
       <Stack.Screen name="StreamingRoomScreen" component={StreamingRoomScreen} />
+      <Stack.Screen name="FriendsScreen" component={FriendsScreen} />
+      <Stack.Screen name="PublicProfileScreen" component={PublicProfileScreen} />
     </Stack.Navigator>
   );
 }
 
 function AuthStack() {
   return (
-    <Stack.Navigator 
-      screenOptions={{ 
-        headerShown: false,
-        animation: 'fade', // Login/Register smooth transition
-        gestureEnabled: true,
-      }}
-    >
-      <Stack.Screen name="Login" component={LoginScreen} />
-      <Stack.Screen name="Register" component={RegisterScreen} />
-      <Stack.Screen name="ForgotPassword" component={ForgotPasswordScreen} />
-    </Stack.Navigator>
+    <View style={{ flex: 1, backgroundColor: '#050609' }}>
+      <Stack.Navigator
+        screenOptions={{
+          headerShown: false,
+          animation: 'none',
+          contentStyle: { backgroundColor: '#050609' },
+          gestureEnabled: true,
+        }}
+      >
+        <Stack.Screen name="Login" component={LoginScreen} />
+        <Stack.Screen name="Register" component={RegisterScreen} />
+        <Stack.Screen name="ForgotPassword" component={ForgotPasswordScreen} />
+      </Stack.Navigator>
+    </View>
   );
 }
 
@@ -115,6 +123,8 @@ function ProfileStack() {
       <Stack.Screen name="HelpScreen" component={HelpScreen} />
       <Stack.Screen name="UserListScreen" component={UserListScreen} />
       <Stack.Screen name="UserCommentsScreen" component={UserCommentsScreen} />
+      <Stack.Screen name="FriendsScreen" component={FriendsScreen} />
+      <Stack.Screen name="PublicProfileScreen" component={PublicProfileScreen} />
       <Stack.Screen name="ListScreen" component={ListScreen} />
       <Stack.Screen name="DetailScreen" component={DetailScreen} />
       <Stack.Screen name="PlayerScreen" component={PlayerScreen} />
@@ -157,8 +167,9 @@ function MainTabs() {
 }
 
 function AppNavigator() {
-  const { user, loading } = useAuth();
+  const { user, loading, entryTransitionId } = useAuth();
   const { themeColor } = useTheme();
+  const [completedEntryTransitionId, setCompletedEntryTransitionId] = React.useState(0);
   
   if (loading) {
     return (
@@ -168,10 +179,28 @@ function AppNavigator() {
     );
   }
 
+  const navigationTheme = {
+    ...DarkTheme,
+    colors: {
+      ...DarkTheme.colors,
+      background: '#050609',
+      card: '#050609',
+    },
+  };
+  const showEntryTransition = !!user && entryTransitionId > completedEntryTransitionId;
+
   return (
-    <NavigationContainer theme={DarkTheme}>
-      {user ? <MainTabs /> : <AuthStack />}
-    </NavigationContainer>
+    <View style={{ flex: 1, backgroundColor: '#050609' }}>
+      <NavigationContainer theme={navigationTheme}>
+        {user ? <MainTabs /> : <AuthStack />}
+      </NavigationContainer>
+      {showEntryTransition ? (
+        <CinematicEntryTransition
+          key={entryTransitionId}
+          onFinish={() => setCompletedEntryTransitionId(entryTransitionId)}
+        />
+      ) : null}
+    </View>
   );
 }
 

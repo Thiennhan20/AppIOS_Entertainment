@@ -1,4 +1,4 @@
-import React, { createContext, useState, useContext, useEffect } from 'react';
+import React, { createContext, useState, useContext, useEffect, useRef } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { authApi } from '../api/authApi';
 import { clearWatchlistCache } from '../components/WatchlistButton';
@@ -14,6 +14,8 @@ export const AuthContext = createContext<any>(null);
 export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [user, setUser] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [entryTransitionId, setEntryTransitionId] = useState(0);
+  const lastTransitionToken = useRef<string | null>(null);
 
   useEffect(() => {
     const restoreSession = async () => {
@@ -60,6 +62,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       await AsyncStorage.setItem('@auth_token', data.token);
       clearWatchlistCache();
       setUser(data.user);
+      requestEntryTransition(data.token);
       return { success: true };
     } catch (err: any) {
       const msg = err.response?.data?.message || err.response?.data?.errors?.[0]?.msg || 'Network error or server unavailable';
@@ -77,11 +80,18 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     }
   };
 
-  const saveAuthenticatedSession = async (token: string) => {
+  const requestEntryTransition = (token: string) => {
+    if (lastTransitionToken.current === token) return;
+    lastTransitionToken.current = token;
+    setEntryTransitionId((current) => current + 1);
+  };
+
+  const saveAuthenticatedSession = async (token: string, animateEntry = false) => {
     await AsyncStorage.setItem('@auth_token', token);
     const data = await authApi.getProfile();
     clearWatchlistCache();
     setUser(data.user);
+    if (animateEntry) requestEntryTransition(token);
   };
 
   const completeGoogleCallback = async (url: string) => {
@@ -95,7 +105,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
       if (!isAuthCallback || !token) return false;
 
-      await saveAuthenticatedSession(token);
+      await saveAuthenticatedSession(token, true);
       return true;
     } catch {
       return false;
@@ -126,7 +136,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         return { success: false, error: 'No login token was returned by the server' };
       }
 
-      await saveAuthenticatedSession(token);
+      await saveAuthenticatedSession(token, true);
       return { success: true };
     } catch (err: any) {
       const msg = err.response?.data?.message || 'Google login error with server';
@@ -154,6 +164,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     await AsyncStorage.removeItem('@auth_token');
     clearWatchlistCache();
     setUser(null);
+    lastTransitionToken.current = null;
   };
 
   const updateProfileContext = async (data: any) => {
@@ -170,7 +181,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   };
 
   return (
-    <AuthContext.Provider value={{ user, loading, login, register, logout, googleLogin, registerSearchHistoryFlush, updateProfile: updateProfileContext }}>
+    <AuthContext.Provider value={{ user, loading, entryTransitionId, login, register, logout, googleLogin, registerSearchHistoryFlush, updateProfile: updateProfileContext }}>
       {children}
     </AuthContext.Provider>
   );

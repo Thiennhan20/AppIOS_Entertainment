@@ -6,6 +6,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
 import { useTheme } from '../../context/ThemeContext';
+import ScrollToTopButton from '../../components/ScrollToTopButton';
+import useScrollToTop from '../../hooks/useScrollToTop';
 
 const FAQItem = ({ question, answer, themeColor }: any) => {
   const [expanded, setExpanded] = useState(false);
@@ -34,6 +36,8 @@ export default function HelpScreen({ navigation }: any) {
   const { t } = useTranslation();
   const insets = useSafeAreaInsets();
   const { themeColor } = useTheme();
+  const scrollRef = useRef<ScrollView>(null);
+  const { handleScroll, showScrollTop } = useScrollToTop();
 
   // Screen load animation
   const fadeAnim = useRef(new Animated.Value(0)).current;
@@ -63,6 +67,9 @@ export default function HelpScreen({ navigation }: any) {
 
       <Animated.ScrollView 
         contentContainerStyle={styles.content}
+        onScroll={handleScroll}
+        ref={scrollRef}
+        scrollEventThrottle={16}
         style={{ opacity: fadeAnim }}
       >
         <View style={[styles.supportBanner, { backgroundColor: `${themeColor}1A`, borderColor: themeColor }]}>
@@ -78,22 +85,27 @@ export default function HelpScreen({ navigation }: any) {
         
         <FAQItem 
           themeColor={themeColor}
-          question="Is the movie app completely free?" 
-          answer="Yes! All basic content on NTN is completely free with highest quality." 
+          question={t('profile.free_app_q')}
+          answer={t('profile.free_app_a')}
         />
         <FAQItem 
           themeColor={themeColor}
-          question="How to load movies smoother on a weak network?" 
-          answer="You can open the watch view, click on Server 1 or Server 3 depending on your connection." 
+          question={t('profile.smooth_q')}
+          answer={t('profile.smooth_a')}
         />
         <FAQItem 
           themeColor={themeColor}
-          question="When will Watch Party be released?" 
-          answer="Watch Party is currently being optimized and will be released this quarter!" 
+          question={t('profile.party_q')}
+          answer={t('profile.party_a')}
         />
         
         <View style={{ height: 40 }} />
       </Animated.ScrollView>
+
+      <ScrollToTopButton
+        onPress={() => scrollRef.current?.scrollTo({ animated: true, y: 0 })}
+        visible={showScrollTop}
+      />
     </View>
   );
 }

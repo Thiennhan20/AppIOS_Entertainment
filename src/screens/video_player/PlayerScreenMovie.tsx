@@ -20,6 +20,8 @@ import CustomAlert from '../../components/CustomAlert';
 import CustomVideoPlayer from '../../components/CustomVideoPlayer';
 import Comments from '../../components/Comments';
 import { roomApi } from '../../api/roomApi';
+import ScrollToTopButton from '../../components/ScrollToTopButton';
+import useScrollToTop from '../../hooks/useScrollToTop';
 
 const { width, height } = Dimensions.get('window');
 
@@ -146,6 +148,8 @@ export default function PlayerScreenMovie({ route, navigation }: any) {
   const { t } = useTranslation();
   const insets = useSafeAreaInsets();
   const { themeColor } = useTheme();
+  const contentScrollRef = useRef<ScrollView>(null);
+  const { handleScroll, showScrollTop } = useScrollToTop();
   
   // Now receiving pre-fetched streaming info from DetailScreen
   const { 
@@ -354,7 +358,13 @@ export default function PlayerScreenMovie({ route, navigation }: any) {
         </View>
 
         {!isFullscreen && (
-          <ScrollView style={{ flex: 1 }} keyboardShouldPersistTaps="handled">
+          <ScrollView
+            keyboardShouldPersistTaps="handled"
+            onScroll={handleScroll}
+            ref={contentScrollRef}
+            scrollEventThrottle={16}
+            style={{ flex: 1 }}
+          >
             <View style={styles.controlsRow}>
               {isTV && (
                 <View style={styles.episodesRow}>
@@ -405,7 +415,12 @@ export default function PlayerScreenMovie({ route, navigation }: any) {
 
             {commentsVisible && (
               <View style={styles.commentsContainer}>
-                <Comments movieId={item.id} type={isTV ? 'tvshow' : 'movie'} title={titleState} />
+                <Comments
+                  movieId={item.id}
+                  onUserPress={(userId) => navigation.navigate('PublicProfileScreen', { userId })}
+                  title={titleState}
+                  type={isTV ? 'tvshow' : 'movie'}
+                />
               </View>
             )}
           </ScrollView>
@@ -455,6 +470,13 @@ export default function PlayerScreenMovie({ route, navigation }: any) {
         isError={alertInfo.isError}
         onClose={() => setAlertInfo(prev => ({ ...prev, visible: false }))}
       />
+
+      {!isFullscreen ? (
+        <ScrollToTopButton
+          onPress={() => contentScrollRef.current?.scrollTo({ animated: true, y: 0 })}
+          visible={showScrollTop}
+        />
+      ) : null}
 
     </View>
   );

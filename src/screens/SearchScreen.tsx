@@ -9,6 +9,7 @@ import LongPressMoviePopup from '../components/LongPressMoviePopup';
 import { useAuth } from '../context/AuthContext';
 import { useSearchHistory } from '../hooks/useSearchHistory';
 import ScrollToTopButton from '../components/ScrollToTopButton';
+import useScrollToTop from '../hooks/useScrollToTop';
 
 export default function SearchScreen({ navigation }: any) {
   const { t } = useTranslation();
@@ -21,13 +22,7 @@ export default function SearchScreen({ navigation }: any) {
   const [longPressedMovie, setLongPressedMovie] = useState<any>(null);
 
   const scrollRef = useRef<FlatList>(null);
-  const [showScrollTop, setShowScrollTop] = useState(false);
-
-  const handleScroll = (event: any) => {
-    const offsetY = event.nativeEvent.contentOffset.y;
-    if (offsetY > 300 && !showScrollTop) setShowScrollTop(true);
-    if (offsetY <= 300 && showScrollTop) setShowScrollTop(false);
-  };
+  const { handleScroll, showScrollTop } = useScrollToTop();
 
   // Search history
   const { user, registerSearchHistoryFlush } = useAuth();

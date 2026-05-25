@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Modal, TouchableWithoutFeedback, ScrollView } from 'react-native';
 import { Image } from 'expo-image';
 import { useAuth } from '../../context/AuthContext';
@@ -9,12 +9,16 @@ import { useTranslation } from 'react-i18next';
 import { LinearGradient } from 'expo-linear-gradient';
 import Constants from 'expo-constants';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import ScrollToTopButton from '../../components/ScrollToTopButton';
+import useScrollToTop from '../../hooks/useScrollToTop';
 
 export default function ProfileScreen({ navigation }: any) {
   const { t } = useTranslation();
   const { user, logout } = useAuth();
   const { themeColor, setThemeColor } = useTheme();
   const insets = useSafeAreaInsets();
+  const scrollRef = useRef<ScrollView>(null);
+  const { handleScroll, showScrollTop } = useScrollToTop();
   
   const [appHash, setAppHash] = useState<string | null>(null);
 
@@ -42,7 +46,13 @@ export default function ProfileScreen({ navigation }: any) {
 
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
-      <ScrollView contentContainerStyle={{ flexGrow: 1, paddingBottom: 60 }} showsVerticalScrollIndicator={false}>
+      <ScrollView
+        contentContainerStyle={{ flexGrow: 1, paddingBottom: 60 }}
+        onScroll={handleScroll}
+        ref={scrollRef}
+        scrollEventThrottle={16}
+        showsVerticalScrollIndicator={false}
+      >
         <View style={styles.header}>
           <Text style={styles.headerTitle}>{t('general.profile')}</Text>
         </View>
@@ -98,7 +108,13 @@ export default function ProfileScreen({ navigation }: any) {
           onPress={() => navigation.navigate('UserCommentsScreen')}
         >
           <Ionicons name="chatbubbles-outline" size={24} color="#ccc" style={styles.menuIcon} />
-          <Text style={styles.menuText}>{t('profile.my_comments', { defaultValue: 'My Comments' })}</Text>
+          <Text style={styles.menuText}>{t('profile.my_comments')}</Text>
+          <Ionicons name="chevron-forward" size={20} color="#555" />
+        </TouchableOpacity>
+
+        <TouchableOpacity style={styles.menuItem} onPress={() => navigation.navigate('FriendsScreen')}>
+          <Ionicons name="people-outline" size={24} color="#ccc" style={styles.menuIcon} />
+          <Text style={styles.menuText}>{t('friends.title')}</Text>
           <Ionicons name="chevron-forward" size={20} color="#555" />
         </TouchableOpacity>
 
@@ -167,6 +183,11 @@ export default function ProfileScreen({ navigation }: any) {
           <Text style={[styles.logoutText, { color: themeColor }]}>{t('profile.logout')}</Text>
         </TouchableOpacity>
       </ScrollView>
+
+      <ScrollToTopButton
+        onPress={() => scrollRef.current?.scrollTo({ animated: true, y: 0 })}
+        visible={showScrollTop}
+      />
 
       {/* Custom Logout Modal */}
       <Modal

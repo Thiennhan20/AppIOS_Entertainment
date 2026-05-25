@@ -20,6 +20,7 @@ import LongPressMoviePopup from '../../components/LongPressMoviePopup';
 import CustomAlert from '../../components/CustomAlert';
 import Comments from '../../components/Comments';
 import ScrollToTopButton from '../../components/ScrollToTopButton';
+import useScrollToTop from '../../hooks/useScrollToTop';
 
 const { width, height } = Dimensions.get('window');
 
@@ -27,13 +28,7 @@ export default function DetailScreenTVShow({ route, navigation }: any) {
   const { t } = useTranslation();
 
   const scrollRef = useRef<ScrollView>(null);
-  const [showScrollTop, setShowScrollTop] = useState(false);
-
-  const handleScroll = (event: any) => {
-    const offsetY = event.nativeEvent.contentOffset.y;
-    if (offsetY > 300 && !showScrollTop) setShowScrollTop(true);
-    if (offsetY <= 300 && showScrollTop) setShowScrollTop(false);
-  };
+  const { handleScroll, showScrollTop } = useScrollToTop();
   const { themeColor } = useTheme();
   const { item, isTV } = route.params;
   const [details, setDetails] = useState<any>(null);
@@ -450,7 +445,12 @@ export default function DetailScreenTVShow({ route, navigation }: any) {
           
           {/* Comments Section */}
           <View style={[styles.sectionContainer, { marginTop: 30 }]}>
-            <Comments movieId={item.id} type="tvshow" title={title} />
+            <Comments
+              movieId={item.id}
+              onUserPress={(userId) => navigation.navigate('PublicProfileScreen', { userId })}
+              title={title}
+              type="tvshow"
+            />
           </View>
 
           <View style={{height: 40}} />
@@ -550,7 +550,6 @@ export default function DetailScreenTVShow({ route, navigation }: any) {
       <ScrollToTopButton 
         visible={showScrollTop} 
         onPress={() => scrollRef.current?.scrollTo({ y: 0, animated: true })}
-        bottomOffset={20} 
       />
     </View>
   );

@@ -10,11 +10,15 @@ import { tmdbApi } from '../api/tmdb';
 import { useTheme } from '../context/ThemeContext';
 import { Ionicons } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
+import ScrollToTopButton from '../components/ScrollToTopButton';
+import useScrollToTop from '../hooks/useScrollToTop';
 
 export default function GameScreen() {
   const { t } = useTranslation();
   const insets = useSafeAreaInsets();
   const { themeColor } = useTheme();
+  const scrollRef = React.useRef<ScrollView>(null);
+  const { handleScroll, showScrollTop } = useScrollToTop();
   const [score, setScore] = useState(0);
   
   // Game state
@@ -114,6 +118,9 @@ export default function GameScreen() {
       style={[styles.container, { paddingTop: insets.top }]}
       keyboardShouldPersistTaps="handled"
       contentContainerStyle={{ paddingBottom: 40 }}
+      onScroll={handleScroll}
+      ref={scrollRef}
+      scrollEventThrottle={16}
     >
       <View style={styles.header}>
         <Text style={styles.headerTitle}>NTN Games 🎮</Text>
@@ -168,6 +175,10 @@ export default function GameScreen() {
         </View>
       </Animated.View>
     </ScrollView>
+    <ScrollToTopButton
+      onPress={() => scrollRef.current?.scrollTo({ animated: true, y: 0 })}
+      visible={showScrollTop}
+    />
     </KeyboardAvoidingView>
   );
 }

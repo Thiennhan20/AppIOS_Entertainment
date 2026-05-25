@@ -1,11 +1,13 @@
 import React, { useEffect, useState, useCallback } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Modal, AppState, AppStateStatus } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Modal, AppState, AppStateStatus, ScrollView } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { Image } from 'expo-image';
+import { versionApi } from '../api/versionApi';
 
-// !! QUAN TRỌNG: ĐIỀN THÔNG TIN TÀI KHOẢN GITHUB VÀ TÊN REPO CỦA APP IOS VÀO ĐÂY !!
-// Ví dụ: tài khoản 'nhannt22', repo 'ios-app'
-const GITHUB_OWNER = 'Thiennhan20';
-const GITHUB_REPO = 'AppIOS_Entertainment';
+const EAS_PROJECT_ID = 'f88f7920-d54d-4f69-b06f-f97afbddf527';
+const EAS_MAIN_BRANCH_ID = '019d0cc8-6a09-70ff-b66a-a5647482098b';
+const EAS_UPDATE_QR_URL =
+  `https://qr.expo.dev/eas-update?projectId=${EAS_PROJECT_ID}&branchId=${EAS_MAIN_BRANCH_ID}&slug=app_ios`;
 
 interface VersionInfo {
   hash: string;
@@ -19,13 +21,11 @@ export default function VersionChecker() {
 
   const checkVersion = useCallback(async () => {
     try {
-      // Chỉ dùng cho public repo. Nếu private repo, cần phải có header Authorization Bearer Token
-      const res = await fetch(`https://api.github.com/repos/${GITHUB_OWNER}/${GITHUB_REPO}/commits/main`, { cache: 'no-store' });
-      if (!res.ok) return;
-      const data = await res.json();
-      
-      const commitHash = data.sha;
-      const commitMessage = data.commit.message;
+      const latestVersion = await versionApi.getLatest();
+      if (!latestVersion) return;
+
+      const commitHash = latestVersion.hash;
+      const commitMessage = latestVersion.message;
 
       // Đọc mã hash cũ đã lưu trong máy
       const notified = await AsyncStorage.getItem('notified_hash');
@@ -42,7 +42,7 @@ export default function VersionChecker() {
       setServerVersion({
         hash: commitHash,
         message: commitMessage,
-        date: new Date(data.commit.author.date).getTime()
+        date: new Date(latestVersion.createdAt).getTime()
       });
       setShowModal(true);
     } catch {
@@ -79,7 +79,10 @@ export default function VersionChecker() {
         <View style={styles.card}>
           <View style={styles.accentBar} />
 
-          <View style={styles.body}>
+          <ScrollView
+            contentContainerStyle={styles.body}
+            showsVerticalScrollIndicator={false}
+          >
             <View style={styles.badge}>
               <Text style={styles.badgeText}>⚡ BẢN CẬP NHẬT BẮT BUỘC</Text>
             </View>
@@ -110,18 +113,31 @@ export default function VersionChecker() {
               </View>
             )}
 
+            <View style={styles.qrContainer}>
+              <Image
+                contentFit="contain"
+                source={{ uri: EAS_UPDATE_QR_URL }}
+                style={styles.qrImage}
+                transition={180}
+              />
+              <Text style={styles.qrTitle}>Quét bằng NTN Development Build</Text>
+              <Text style={styles.qrDescription}>
+                Mã này mở bản cập nhật mới nhất của nhánh main trên app development.
+              </Text>
+            </View>
+
             <TouchableOpacity
               style={styles.primaryBtn}
               onPress={handleUpdate}
               activeOpacity={0.8}
             >
-              <Text style={styles.primaryBtnText}>Đã hiểu, tôi sẽ đóng app ＆ quét lại QR</Text>
+              <Text style={styles.primaryBtnText}>Đã hiểu, tôi sẽ đóng app và quét QR</Text>
             </TouchableOpacity>
 
             <Text style={styles.hint}>
-              Vui lòng vuốt tắt app hoàn toàn và mở lại Expo Go để hoàn tất cập nhật.
+              EAS Update có runtimeVersion cần mở bằng development build, không phải Expo Go.
             </Text>
-          </View>
+          </ScrollView>
         </View>
       </View>
     </Modal>
@@ -139,6 +155,7 @@ const styles = StyleSheet.create({
   card: {
     width: '100%',
     maxWidth: 360,
+    maxHeight: '92%',
     backgroundColor: '#1a1a2e',
     borderRadius: 20,
     overflow: 'hidden',
@@ -238,6 +255,33 @@ const styles = StyleSheet.create({
     fontSize: 13,
     flex: 1,
     lineHeight: 19,
+  },
+  qrContainer: {
+    width: '100%',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255,255,255,0.04)',
+    borderRadius: 14,
+    padding: 12,
+    marginBottom: 18,
+  },
+  qrImage: {
+    width: 148,
+    height: 148,
+    backgroundColor: '#fff',
+    borderRadius: 10,
+    marginBottom: 10,
+  },
+  qrTitle: {
+    color: '#f3f4f6',
+    fontSize: 13,
+    fontWeight: '700',
+    marginBottom: 4,
+  },
+  qrDescription: {
+    color: '#9ca3af',
+    fontSize: 11,
+    textAlign: 'center',
+    lineHeight: 16,
   },
   primaryBtn: {
     width: '100%',

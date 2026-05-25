@@ -6,10 +6,9 @@ import { LinearGradient } from 'expo-linear-gradient';
 interface ScrollToTopButtonProps {
   visible: boolean;
   onPress: () => void;
-  bottomOffset?: number;
 }
 
-export default function ScrollToTopButton({ visible, onPress, bottomOffset = 20 }: ScrollToTopButtonProps) {
+export default function ScrollToTopButton({ visible, onPress }: ScrollToTopButtonProps) {
   const animValue = useRef(new Animated.Value(0)).current;
   const isVisible = useRef(false);
 
@@ -37,7 +36,6 @@ export default function ScrollToTopButton({ visible, onPress, bottomOffset = 20 
       style={[
         styles.container, 
         { 
-          bottom: bottomOffset,
           transform: [
             { scale: animValue },
             { translateY: animValue.interpolate({ inputRange: [0, 1], outputRange: [20, 0] }) }
@@ -63,6 +61,7 @@ export default function ScrollToTopButton({ visible, onPress, bottomOffset = 20 
 
 const styles = StyleSheet.create({
   container: {
+    bottom: 88,
     position: 'absolute',
     right: 20,
     zIndex: 9999,

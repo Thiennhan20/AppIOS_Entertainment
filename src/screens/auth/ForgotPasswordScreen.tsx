@@ -1,21 +1,39 @@
 import React, { useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, ActivityIndicator, KeyboardAvoidingView, Platform, Alert, Image, ScrollView, Animated, Keyboard, TouchableWithoutFeedback } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
 import { authApi } from '../../api/authApi';
+import CustomAlert from '../../components/CustomAlert';
+import { localizeAuthError } from '../../utils/authMessages';
+import {
+  AuthFooter,
+  AuthPrimaryButton,
+  AuthScreenLayout,
+  AuthTextField,
+} from '../../components/AuthScreenLayout';
 
 export default function ForgotPasswordScreen({ navigation }: any) {
   const { t } = useTranslation();
-  const insets = useSafeAreaInsets();
   const [email, setEmail] = useState('');
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
+  const [alertConfig, setAlertConfig] = useState({ visible: false, title: '', message: '' });
+
+  const showError = (message: string) => {
+    setAlertConfig({ visible: true, title: t('general.error'), message });
+  };
+
+  const showLogin = () => {
+    if (navigation.canGoBack()) {
+      navigation.goBack();
+      return;
+    }
+    navigation.navigate('Login');
+  };
 
   const handleReset = async () => {
     if (!email) {
-      Alert.alert('Error', t('auth.enter_email'));
+      showError(t('auth.enter_email'));
       return;
     }
 
@@ -24,199 +42,83 @@ export default function ForgotPasswordScreen({ navigation }: any) {
       await authApi.forgotPassword(email);
       setSuccess(true);
     } catch (error: any) {
-      Alert.alert('Error', error.response?.data?.message || t('auth.error_sending_request'));
+      showError(localizeAuthError(error.response?.data?.message, t, 'auth.error_sending_request'));
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
-      <LinearGradient 
-        colors={['#1a0505', '#0a0a0a', '#000000']} 
-        style={[styles.container, { paddingTop: insets.top }]}
+    <>
+      <AuthScreenLayout
+        heading={t('auth.forgot_password')}
+        mode="forgot"
+        navigation={navigation}
+        subtitle={!success ? t('auth.enter_registered_email') : undefined}
       >
-        <KeyboardAvoidingView 
-          style={styles.keyboardView}
-          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-        >
-          <ScrollView 
-            contentContainerStyle={styles.scrollContent}
-            showsVerticalScrollIndicator={false}
-            keyboardShouldPersistTaps="handled"
-          >
-            <View style={styles.header}>
-              <Image 
-                source={{ uri: 'https://moviesaw.vercel.app/logo.png' }} 
-                style={styles.logo} 
-                resizeMode="contain"
-              />
-            </View>
-
-            <View style={styles.formContainer}>
-          <Text style={styles.title}>{t('auth.forgot_password')}</Text>
-          
-          {success ? (
-            <View style={styles.successContainer}>
-               <Ionicons name="checkmark-circle" size={60} color="#4CAF50" />
-               <Text style={styles.successText}>
-                We have sent a password recovery link to your inbox. Please check your email (including spam folder).
-               </Text>
-               <TouchableOpacity 
-                 style={styles.button} 
-                 onPress={() => navigation.navigate('Login')}
-               >
-                 <Text style={styles.buttonText}>{t('auth.back_to_login')}</Text>
-               </TouchableOpacity>
-            </View>
-          ) : (
-            <>
-              <Text style={styles.subtitle}>
-                Enter your registered email. We will send you a link to reset your password.
-              </Text>
-
-              <View style={styles.inputContainer}>
-                <Ionicons name="mail-outline" size={20} color="#8c8c8c" style={styles.inputIcon} />
-                <TextInput
-                  style={styles.input}
-                  placeholder="Email"
-                  placeholderTextColor="#8c8c8c"
-                  value={email}
-                  onChangeText={setEmail}
-                  keyboardType="email-address"
-                  autoCapitalize="none"
-                />
-              </View>
-
-              <TouchableOpacity 
-                style={styles.button} 
-                onPress={handleReset}
-                disabled={loading}
-              >
-                {loading ? (
-                  <ActivityIndicator color="#fff" />
-                ) : (
-                  <Text style={styles.buttonText}>{t('auth.send_recovery_link')}</Text>
-                )}
-              </TouchableOpacity>
-
-              <View style={styles.footer}>
-                <Text style={styles.footerText}>{t('auth.remembered_password')}</Text>
-                <TouchableOpacity onPress={() => navigation.navigate('Login')} style={{ padding: 5 }}>
-                  <Text style={styles.footerLink}>Log In ngay</Text>
-                </TouchableOpacity>
-              </View>
-            </>
-          )}
-
-            </View>
-          </ScrollView>
-        </KeyboardAvoidingView>
-      </LinearGradient>
-    </TouchableWithoutFeedback>
+        {success ? (
+          <View style={styles.success}>
+            <Ionicons name="checkmark-circle" size={52} color="#35C46A" style={styles.successIcon} />
+            <Text style={styles.successText}>{t('auth.recovery_sent')}</Text>
+            <AuthPrimaryButton
+              label={t('auth.back_to_login')}
+              loading={false}
+              onPress={showLogin}
+            />
+          </View>
+        ) : (
+          <>
+            <AuthTextField
+              autoCapitalize="none"
+              autoComplete="email"
+              icon="mail-outline"
+              keyboardType="email-address"
+              onChangeText={setEmail}
+              onSubmitEditing={handleReset}
+              placeholder="Email"
+              returnKeyType="send"
+              textContentType="emailAddress"
+              value={email}
+            />
+            <AuthPrimaryButton
+              label={t('auth.send_recovery_link')}
+              loading={loading}
+              onPress={handleReset}
+            />
+            <AuthFooter
+              action={t('auth.back_to_login')}
+              onPress={showLogin}
+              prompt={t('auth.remembered_password')}
+            />
+          </>
+        )}
+      </AuthScreenLayout>
+      <CustomAlert
+        confirmText={t('general.close')}
+        iconName="alert-circle-outline"
+        isError
+        message={alertConfig.message}
+        onClose={() => setAlertConfig((current) => ({ ...current, visible: false }))}
+        title={alertConfig.title}
+        visible={alertConfig.visible}
+      />
+    </>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
-  keyboardView: {
-    flex: 1,
-  },
-  scrollContent: {
-    flexGrow: 1,
-    justifyContent: 'center',
-    padding: 24,
-    paddingBottom: 60,
-  },
-  header: {
-    alignItems: 'center',
-    marginBottom: 40,
-  },
-  logo: {
-    width: 200,
-    height: 60,
-  },
-  formContainer: {
-    backgroundColor: 'rgba(20, 20, 20, 0.95)',
-    padding: 30,
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.1)',
-  },
-  title: {
-    fontSize: 28,
-    fontWeight: 'bold',
-    color: '#fff',
-    marginBottom: 10,
-    textAlign: 'center',
-  },
-  subtitle: {
-    color: '#aaa',
-    fontSize: 14,
-    textAlign: 'center',
-    marginBottom: 30,
-    lineHeight: 20,
-  },
-  successContainer: {
-    alignItems: 'center',
-    paddingVertical: 20,
-  },
-  successText: {
-    color: '#fff',
-    fontSize: 15,
-    textAlign: 'center',
-    marginTop: 20,
-    marginBottom: 30,
-    lineHeight: 22,
-  },
-  inputContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#333',
-    borderRadius: 8,
-    marginBottom: 20,
-    paddingHorizontal: 16,
-    height: 55,
-  },
-  inputIcon: {
-    marginRight: 10,
-  },
-  input: {
-    flex: 1,
-    color: '#fff',
-    fontSize: 16,
-    height: '100%',
-  },
-  button: {
-    backgroundColor: '#E50914',
-    height: 50,
-    borderRadius: 8,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 24,
+  success: {
     width: '100%',
   },
-  buttonText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: 'bold',
+  successIcon: {
+    alignSelf: 'center',
+    marginBottom: 15,
   },
-  footer: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginTop: 10,
-  },
-  footerText: {
-    color: '#8c8c8c',
+  successText: {
+    color: '#CFD3DB',
     fontSize: 14,
-  },
-  footerLink: {
-    color: '#fff',
-    fontSize: 14,
-    fontWeight: 'bold',
-    marginLeft: 6,
+    lineHeight: 21,
+    marginBottom: 18,
+    textAlign: 'center',
   },
 });

@@ -8,6 +8,7 @@ import { tmdbApi } from '../api/tmdb';
 import FilterModal, { FilterState } from '../components/FilterModal';
 import LongPressMoviePopup from '../components/LongPressMoviePopup';
 import ScrollToTopButton from '../components/ScrollToTopButton';
+import useScrollToTop from '../hooks/useScrollToTop';
 
 export default function ListScreen({ route, navigation }: any) {
   const insets = useSafeAreaInsets();
@@ -24,13 +25,7 @@ export default function ListScreen({ route, navigation }: any) {
   const [longPressedMovie, setLongPressedMovie] = useState<any>(null);
 
   const scrollRef = useRef<FlatList>(null);
-  const [showScrollTop, setShowScrollTop] = useState(false);
-
-  const handleScroll = (event: any) => {
-    const offsetY = event.nativeEvent.contentOffset.y;
-    if (offsetY > 300 && !showScrollTop) setShowScrollTop(true);
-    if (offsetY <= 300 && showScrollTop) setShowScrollTop(false);
-  };
+  const { handleScroll, showScrollTop } = useScrollToTop();
 
   const isTV = type === 'tv';
   const title = isTV ? 'TV Shows' : 'Movies';

@@ -10,6 +10,8 @@ import { roomApi } from '../api/roomApi';
 import { useAuth } from '../context/AuthContext';
 import CustomAlert from '../components/CustomAlert';
 import { LinearGradient } from 'expo-linear-gradient';
+import ScrollToTopButton from '../components/ScrollToTopButton';
+import useScrollToTop from '../hooks/useScrollToTop';
 
 const { width } = Dimensions.get('window');
 
@@ -29,6 +31,8 @@ export default function StreamingScreen() {
   const [activeRooms, setActiveRooms] = useState<any[]>([]);
   const [loadingRooms, setLoadingRooms] = useState(true);
   const { user } = useAuth();
+  const scrollRef = useRef<FlatList>(null);
+  const { handleScroll, showScrollTop } = useScrollToTop();
 
   const fetchRooms = async () => {
     try {
@@ -136,7 +140,10 @@ export default function StreamingScreen() {
       </View>
 
       <Animated.FlatList 
+         ref={scrollRef}
          data={activeRooms}
+         onScroll={handleScroll}
+         scrollEventThrottle={16}
          keyExtractor={(item: any) => item.room_id}
          style={{ flex: 1, opacity: fadeAnim, transform: [{ translateY }] }}
          contentContainerStyle={styles.scrollContent}
@@ -260,6 +267,11 @@ export default function StreamingScreen() {
              </View>
            </TouchableOpacity>
          )}
+      />
+
+      <ScrollToTopButton
+        onPress={() => scrollRef.current?.scrollToOffset({ animated: true, offset: 0 })}
+        visible={showScrollTop}
       />
 
       <CustomAlert

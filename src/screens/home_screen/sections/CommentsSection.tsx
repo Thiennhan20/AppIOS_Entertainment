@@ -48,21 +48,31 @@ export function TopCommentsSection({ data, navigation }: { data: any[]; navigati
             </View>
             <Text style={styles.topCommentContent} numberOfLines={3}>"{item.content}"</Text>
             <View style={styles.topCommentFooter}>
-              <Image source={{ uri: item.user?.avatar || 'https://i.pravatar.cc/150' }} style={styles.topCommentAvatar} />
-              <View style={{ flex: 1, justifyContent: 'center' }}>
-                <Text style={styles.topCommentName} numberOfLines={1}>{item.user?.name}</Text>
-                <View style={styles.topStatsRow}>
-                  <Ionicons name="heart" size={13} color="#E50914" />
-                  <Text style={styles.topStatText}>{item.likes} {t('home.upvotes')}</Text>
-                  {item.replyCount ? (
-                    <>
-                      <View style={styles.dotSeparator} />
-                      <Ionicons name="chatbubbles" size={13} color="#a32cc4" />
-                      <Text style={styles.topStatText}>{item.replyCount}</Text>
-                    </>
-                  ) : null}
+              <TouchableOpacity
+                activeOpacity={0.72}
+                disabled={!item.user?._id}
+                onPress={(event) => {
+                  event.stopPropagation();
+                  if (item.user?._id) navigation.navigate('PublicProfileScreen', { userId: item.user._id });
+                }}
+                style={{ alignItems: 'center', flex: 1, flexDirection: 'row' }}
+              >
+                <Image source={{ uri: item.user?.avatar || 'https://i.pravatar.cc/150' }} style={styles.topCommentAvatar} />
+                <View style={{ flex: 1, justifyContent: 'center' }}>
+                  <Text style={styles.topCommentName} numberOfLines={1}>{item.user?.name}</Text>
+                  <View style={styles.topStatsRow}>
+                    <Ionicons name="heart" size={13} color="#E50914" />
+                    <Text style={styles.topStatText}>{item.likes} {t('home.upvotes')}</Text>
+                    {item.replyCount ? (
+                      <>
+                        <View style={styles.dotSeparator} />
+                        <Ionicons name="chatbubbles" size={13} color="#a32cc4" />
+                        <Text style={styles.topStatText}>{item.replyCount}</Text>
+                      </>
+                    ) : null}
+                  </View>
                 </View>
-              </View>
+              </TouchableOpacity>
               <View style={styles.topRankBadge}>
                 <Text style={styles.topRankText}>#{index + 1}</Text>
               </View>
@@ -104,14 +114,24 @@ export function RecentCommentsSection({ data, navigation }: { data: any[]; navig
             }}
           >
             <View style={styles.recentHeader}>
-              <View style={styles.recentAvatarContainer}>
-                <Image source={{ uri: item.user?.avatar || 'https://i.pravatar.cc/150' }} style={styles.recentAvatar} />
-                <View style={styles.recentOnlineDot} />
-              </View>
-              <View style={styles.recentMeta}>
-                <Text style={styles.recentName} numberOfLines={1}>{item.user?.name}</Text>
-                <Text style={styles.recentTime}>{getTimeSince(item.createdAt, t)}</Text>
-              </View>
+              <TouchableOpacity
+                activeOpacity={0.72}
+                disabled={!item.user?._id}
+                onPress={(event) => {
+                  event.stopPropagation();
+                  if (item.user?._id) navigation.navigate('PublicProfileScreen', { userId: item.user._id });
+                }}
+                style={{ alignItems: 'center', flex: 1, flexDirection: 'row' }}
+              >
+                <View style={styles.recentAvatarContainer}>
+                  <Image source={{ uri: item.user?.avatar || 'https://i.pravatar.cc/150' }} style={styles.recentAvatar} />
+                  <View style={styles.recentOnlineDot} />
+                </View>
+                <View style={styles.recentMeta}>
+                  <Text style={styles.recentName} numberOfLines={1}>{item.user?.name}</Text>
+                  <Text style={styles.recentTime}>{getTimeSince(item.createdAt, t)}</Text>
+                </View>
+              </TouchableOpacity>
               <View style={styles.recentMovieSide}>
                  {item.moviePoster && <Image source={{ uri: item.moviePoster }} style={styles.recentSidePoster} />}
                  <Text style={styles.recentSideTitle} numberOfLines={1}>{item.movieTitle}</Text>
