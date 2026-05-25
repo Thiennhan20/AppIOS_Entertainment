@@ -2,12 +2,14 @@ import React, { useEffect, useState, useCallback } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Modal, AppState, AppStateStatus, ScrollView } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Image } from 'expo-image';
+import { File, Paths } from 'expo-file-system';
+import * as Sharing from 'expo-sharing';
 import { versionApi } from '../api/versionApi';
 
 const EAS_PROJECT_ID = 'f88f7920-d54d-4f69-b06f-f97afbddf527';
 const EAS_MAIN_BRANCH_ID = '019d0cc8-6a09-70ff-b66a-a5647482098b';
 const EAS_UPDATE_QR_URL =
-  `https://qr.expo.dev/eas-update?projectId=${EAS_PROJECT_ID}&branchId=${EAS_MAIN_BRANCH_ID}`;
+  `https://qr.expo.dev/eas-update?projectId=${EAS_PROJECT_ID}&branchId=${EAS_MAIN_BRANCH_ID}&slug=app_ios`;
 
 interface VersionInfo {
   hash: string;
@@ -18,6 +20,8 @@ interface VersionInfo {
 export default function VersionChecker() {
   const [serverVersion, setServerVersion] = useState<VersionInfo | null>(null);
   const [showModal, setShowModal] = useState(false);
+  const [isDownloadingQr, setIsDownloadingQr] = useState(false);
+  const [qrDownloadMessage, setQrDownloadMessage] = useState<string | null>(null);
 
   const checkVersion = useCallback(async () => {
     try {
@@ -71,6 +75,34 @@ export default function VersionChecker() {
     // Cứ để modal hiện chặn ở đó, bắt buộc user phải tắt app mở lại.
   };
 
+  const handleDownloadQr = async () => {
+    setIsDownloadingQr(true);
+    setQrDownloadMessage(null);
+
+    try {
+      const canShare = await Sharing.isAvailableAsync();
+      if (!canShare) {
+        setQrDownloadMessage('Thiết bị này không hỗ trợ lưu hoặc chia sẻ mã QR.');
+        return;
+      }
+
+      const qrFile = new File(Paths.cache, 'ntn-update-qr.svg');
+      const downloadedQr = await File.downloadFileAsync(EAS_UPDATE_QR_URL, qrFile, {
+        idempotent: true,
+      });
+
+      await Sharing.shareAsync(downloadedQr.uri, {
+        dialogTitle: 'Lưu mã QR cập nhật NTN',
+        mimeType: 'image/svg+xml',
+      });
+      setQrDownloadMessage('Đã mở tuỳ chọn lưu hoặc chia sẻ mã QR.');
+    } catch {
+      setQrDownloadMessage('Không thể tải mã QR. Vui lòng thử lại.');
+    } finally {
+      setIsDownloadingQr(false);
+    }
+  };
+
   if (!showModal || !serverVersion) return null;
 
   return (
@@ -120,10 +152,23 @@ export default function VersionChecker() {
                 style={styles.qrImage}
                 transition={180}
               />
-              <Text style={styles.qrTitle}>Quét bằng Expo Go (SDK 54)</Text>
+              <Text style={styles.qrTitle}>Quét mã QR nếu app chưa cập nhật</Text>
               <Text style={styles.qrDescription}>
-                Mã này mở bản cập nhật mới nhất của nhánh main trực tiếp trong Expo Go.
+                Lưu ý: trước khi quét, hãy xoá bản app_ios cũ trong NTN Development Build nếu đang lưu.
               </Text>
+              <TouchableOpacity
+                style={styles.downloadQrBtn}
+                onPress={handleDownloadQr}
+                activeOpacity={0.82}
+                disabled={isDownloadingQr}
+              >
+                <Text style={styles.downloadQrText}>
+                  {isDownloadingQr ? 'Đang chuẩn bị mã QR...' : 'Tải mã QR về máy'}
+                </Text>
+              </TouchableOpacity>
+              {qrDownloadMessage && (
+                <Text style={styles.downloadQrMessage}>{qrDownloadMessage}</Text>
+              )}
             </View>
 
             <TouchableOpacity
@@ -135,7 +180,7 @@ export default function VersionChecker() {
             </TouchableOpacity>
 
             <Text style={styles.hint}>
-              Hãy dùng Expo Go hỗ trợ SDK 54 và kết nối mạng ổn định để tải bản cập nhật.
+              Expo Go không mở được bản cập nhật dùng runtime riêng của ứng dụng. Hãy cài NTN Development Build rồi quét mã.
             </Text>
           </ScrollView>
         </View>
@@ -278,6 +323,27 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   qrDescription: {
+    color: '#9ca3af',
+    fontSize: 11,
+    textAlign: 'center',
+    lineHeight: 16,
+  },
+  downloadQrBtn: {
+    marginTop: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: 'rgba(239,68,68,0.55)',
+    backgroundColor: 'rgba(239,68,68,0.12)',
+  },
+  downloadQrText: {
+    color: '#f87171',
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  downloadQrMessage: {
+    marginTop: 8,
     color: '#9ca3af',
     fontSize: 11,
     textAlign: 'center',
