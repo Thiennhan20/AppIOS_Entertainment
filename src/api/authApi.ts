@@ -7,10 +7,17 @@ const apiClient = axios.create({
   timeout: 60000, // Tăng lên 60s để chờ server Render khởi động (cold-boot)
 });
 
+import i18n from '../i18n';
+
 apiClient.interceptors.request.use(async (config) => {
   const token = await AsyncStorage.getItem('@auth_token');
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
+  }
+  
+  // Gửi ngôn ngữ hiện tại của App lên Server
+  if (i18n.language) {
+    config.headers['Accept-Language'] = i18n.language;
   }
 
   return config;

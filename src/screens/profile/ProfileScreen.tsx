@@ -34,6 +34,7 @@ export default function ProfileScreen({ navigation }: any) {
   }, []);
 
   const [logoutModalVisible, setLogoutModalVisible] = useState(false);
+  const [avatarPreviewVisible, setAvatarPreviewVisible] = useState(false);
 
   const handleLogoutPress = () => {
     setLogoutModalVisible(true);
@@ -58,15 +59,20 @@ export default function ProfileScreen({ navigation }: any) {
         </View>
 
       <View style={[styles.profileSection, { borderBottomColor: themeColor }]}>
-        {user?.avatar ? (
-          <Image source={{ uri: user.avatar }} style={[styles.avatar, { borderColor: themeColor }]} contentFit="cover" />
-        ) : (
-          <View style={[styles.avatarPlaceholder, { borderColor: themeColor }]}>
-            <Text style={styles.avatarInitials}>
-              {user?.name?.charAt(0)?.toUpperCase() || 'U'}
-            </Text>
-          </View>
-        )}
+        <TouchableOpacity 
+          onPress={() => user?.avatar ? setAvatarPreviewVisible(true) : null}
+          activeOpacity={0.85}
+        >
+          {user?.avatar ? (
+            <Image source={{ uri: user.avatar }} style={[styles.avatar, { borderColor: themeColor }]} contentFit="cover" />
+          ) : (
+            <View style={[styles.avatarPlaceholder, { borderColor: themeColor }]}>
+              <Text style={styles.avatarInitials}>
+                {user?.name?.charAt(0)?.toUpperCase() || 'U'}
+              </Text>
+            </View>
+          )}
+        </TouchableOpacity>
         <Text style={styles.name}>{user?.name || 'User'}</Text>
         <Text style={styles.email}>{user?.email || 'email@example.com'}</Text>
         
@@ -197,6 +203,36 @@ export default function ProfileScreen({ navigation }: any) {
                     <Text style={styles.modalConfirmBtnText}>{t('profile.logout')}</Text>
                   </TouchableOpacity>
                 </View>
+              </View>
+            </TouchableWithoutFeedback>
+          </View>
+        </TouchableWithoutFeedback>
+      </Modal>
+
+      {/* Avatar Preview Modal */}
+      <Modal
+        visible={avatarPreviewVisible}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setAvatarPreviewVisible(false)}
+      >
+        <TouchableWithoutFeedback onPress={() => setAvatarPreviewVisible(false)}>
+          <View style={styles.previewModalOverlay}>
+            <TouchableWithoutFeedback>
+              <View style={styles.previewModalContainer}>
+                {user?.avatar && (
+                  <Image 
+                    source={{ uri: user.avatar }} 
+                    style={[styles.previewAvatarImage, { borderColor: themeColor }]} 
+                    contentFit="contain"
+                  />
+                )}
+                <TouchableOpacity 
+                  style={[styles.previewCloseBtn, { backgroundColor: themeColor }]}
+                  onPress={() => setAvatarPreviewVisible(false)}
+                >
+                  <Ionicons name="close" size={24} color="#fff" />
+                </TouchableOpacity>
               </View>
             </TouchableWithoutFeedback>
           </View>
@@ -413,5 +449,39 @@ const styles = StyleSheet.create({
   colorCircleActive: {
     borderColor: '#fff',
     transform: [{ scale: 1.15 }],
+  },
+  previewModalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.85)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  previewModalContainer: {
+    width: 300,
+    height: 300,
+    justifyContent: 'center',
+    alignItems: 'center',
+    position: 'relative',
+  },
+  previewAvatarImage: {
+    width: 300,
+    height: 300,
+    borderRadius: 24,
+    borderWidth: 3,
+  },
+  previewCloseBtn: {
+    position: 'absolute',
+    top: -64,
+    right: 0,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+    elevation: 5,
   },
 });

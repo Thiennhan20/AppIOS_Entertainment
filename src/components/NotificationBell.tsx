@@ -291,6 +291,7 @@ export default function NotificationBell({ navigation }: Props) {
     }
 
     if (notification.type !== 'comment_liked' && notification.type !== 'comment_replied') {
+      setVisible(false);
       return;
     }
 
@@ -444,13 +445,14 @@ export default function NotificationBell({ navigation }: Props) {
         ) : null}
       </TouchableOpacity>
 
-      <Modal
-        animationType="fade"
-        onRequestClose={() => setVisible(false)}
-        statusBarTranslucent
-        transparent
-        visible={visible}
-      >
+      {visible && (
+        <Modal
+          animationType="fade"
+          onRequestClose={() => setVisible(false)}
+          statusBarTranslucent
+          transparent
+          visible={visible}
+        >
         <Pressable onPress={() => setVisible(false)} style={[styles.overlay, { paddingTop: insets.top + 60 }]}>
           <Pressable onPress={(event) => event.stopPropagation()} style={styles.panel}>
             <View style={styles.panelHeader}>
@@ -534,7 +536,8 @@ export default function NotificationBell({ navigation }: Props) {
             )}
           </Pressable>
         </Pressable>
-      </Modal>
+        </Modal>
+      )}
     </>
   );
 }

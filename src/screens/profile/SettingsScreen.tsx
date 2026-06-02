@@ -1,7 +1,8 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { 
   StyleSheet, Text, View, TextInput, TouchableOpacity, 
-  KeyboardAvoidingView, Platform, Animated, Easing, ActivityIndicator, Image, ScrollView
+  KeyboardAvoidingView, Platform, Animated, Easing, ActivityIndicator, Image, ScrollView,
+  Modal, TouchableWithoutFeedback
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -25,6 +26,7 @@ export default function SettingsScreen({ navigation }: any) {
   const [email, setEmail] = useState(user?.email || '');
   const [saving, setSaving] = useState(false);
   const [avatarBase64, setAvatarBase64] = useState<string | null>(null);
+  const [avatarMenuVisible, setAvatarMenuVisible] = useState(false);
 
   const [alertConfig, setAlertConfig] = useState({
     visible: false,
@@ -35,7 +37,21 @@ export default function SettingsScreen({ navigation }: any) {
     onClose: () => {}
   });
 
-  const currentAvatarUrl = avatarBase64 ? `data:image/jpeg;base64,${avatarBase64}` : (user?.avatar || null);
+  const currentAvatarUrl = avatarBase64 === "" 
+    ? (user?.originalAvatar || null) 
+    : (avatarBase64 ? `data:image/jpeg;base64,${avatarBase64}` : (user?.avatar || null));
+
+  const showRemoveRestore = currentAvatarUrl && (
+    avatarBase64 !== null
+      ? avatarBase64 !== ""
+      : (user?.avatar !== user?.originalAvatar || !user?.originalAvatar)
+  );
+
+  const isRestoreMode = user?.originalAvatar ? (
+    avatarBase64 !== null
+      ? avatarBase64 !== ""
+      : user?.avatar !== user?.originalAvatar
+  ) : false;
 
   const showAlert = (title: string, message: string, isError = false, onSuccess?: () => void) => {
     setAlertConfig({
@@ -81,14 +97,15 @@ export default function SettingsScreen({ navigation }: any) {
     setSaving(true);
     
     const data: any = { name };
-    if (avatarBase64) {
-      data.avatar = `data:image/jpeg;base64,${avatarBase64}`;
+    if (avatarBase64 !== null) {
+      data.avatar = avatarBase64 === "" ? "" : `data:image/jpeg;base64,${avatarBase64}`;
     }
 
     const res = await updateProfile(data);
     setSaving(false);
 
     if (res.success) {
+      setAvatarBase64(null);
       showAlert(
         t('general.success') || 'Success', 
         t('profile.account_updated') || 'Profile updated successfully!', 
@@ -129,8 +146,8 @@ export default function SettingsScreen({ navigation }: any) {
           sizeInBytes = (base64Str.length * 3) / 4;
         }
 
-        if (sizeInBytes && sizeInBytes > 5 * 1024 * 1024) {
-          showAlert(t('general.error') || 'Error', t('profile.file_too_large') || 'Image size must be less than 5MB', true);
+        if (sizeInBytes && sizeInBytes > 10 * 1024 * 1024) {
+          showAlert(t('general.error') || 'Error', t('profile.file_too_large') || 'Image size must be less than 10MB', true);
           return;
         }
 
@@ -179,9 +196,9 @@ export default function SettingsScreen({ navigation }: any) {
           )}
           <TouchableOpacity 
             style={[styles.editBadge, { backgroundColor: themeColor }]}
-            onPress={handleChangeAvatar}
+            onPress={() => setAvatarMenuVisible(true)}
           >
-            <Ionicons name="camera" size={14} color="#fff" />
+            <Ionicons name="ellipsis-vertical" size={14} color="#fff" />
           </TouchableOpacity>
         </View>
 
@@ -223,6 +240,73 @@ export default function SettingsScreen({ navigation }: any) {
         onPress={() => scrollRef.current?.scrollTo({ animated: true, y: 0 })}
         visible={showScrollTop}
       />
+
+      <Modal
+        visible={avatarMenuVisible}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setAvatarMenuVisible(false)}
+      >
+        <TouchableWithoutFeedback onPress={() => setAvatarMenuVisible(false)}>
+          <View style={styles.modalOverlay}>
+            <TouchableWithoutFeedback>
+              <View style={[styles.bottomSheetContent, { borderColor: `${themeColor}22` }]}>
+                <View style={styles.bottomSheetHeader}>
+                  <View style={styles.bottomSheetKnob} />
+                  <Text style={styles.bottomSheetTitle}>
+                    {t('profile.avatar_options') || 'Tùy chọn ảnh đại diện'}
+                  </Text>
+                </View>
+
+                <TouchableOpacity 
+                  style={styles.bottomSheetItem} 
+                  onPress={() => {
+                    setAvatarMenuVisible(false);
+                    handleChangeAvatar();
+                  }}
+                >
+                  <View style={[styles.bottomSheetIconContainer, { backgroundColor: `${themeColor}15` }]}>
+                    <Ionicons name="image-outline" size={20} color={themeColor} />
+                  </View>
+                  <Text style={styles.bottomSheetItemText}>
+                    {t('profile.change_avatar') || 'Đổi ảnh đại diện'}
+                  </Text>
+                </TouchableOpacity>
+
+                {showRemoveRestore && (
+                  <TouchableOpacity 
+                    style={styles.bottomSheetItem} 
+                    onPress={() => {
+                      setAvatarMenuVisible(false);
+                      setAvatarBase64(""); // Empty string represents remove/restore
+                    }}
+                  >
+                    <View style={[styles.bottomSheetIconContainer, { backgroundColor: 'rgba(235, 94, 85, 0.15)' }]}>
+                      <Ionicons 
+                        name={isRestoreMode ? "refresh-outline" : "trash-outline"} 
+                        size={20} 
+                        color="#eb5e55" 
+                      />
+                    </View>
+                    <Text style={[styles.bottomSheetItemText, { color: '#eb5e55' }]}>
+                      {isRestoreMode 
+                        ? (t('profile.restore_original') || 'Khôi phục ảnh đại diện gốc')
+                        : (t('profile.remove_avatar') || 'Xóa ảnh đại diện')}
+                    </Text>
+                  </TouchableOpacity>
+                )}
+
+                <TouchableOpacity 
+                  style={[styles.bottomSheetCancelBtn, { marginTop: 15 }]} 
+                  onPress={() => setAvatarMenuVisible(false)}
+                >
+                  <Text style={styles.bottomSheetCancelText}>{t('general.cancel') || 'Hủy'}</Text>
+                </TouchableOpacity>
+              </View>
+            </TouchableWithoutFeedback>
+          </View>
+        </TouchableWithoutFeedback>
+      </Modal>
 
       <CustomAlert
         visible={alertConfig.visible}
@@ -333,6 +417,70 @@ const styles = StyleSheet.create({
   saveBtnText: {
     color: '#fff',
     fontSize: 16,
+    fontWeight: 'bold',
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.75)',
+    justifyContent: 'flex-end', // Aligns modal to the bottom for slide up
+  },
+  bottomSheetContent: {
+    backgroundColor: '#1A1A1F',
+    width: '100%',
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    padding: 24,
+    paddingBottom: 40,
+    borderTopWidth: 1,
+    borderLeftWidth: 1,
+    borderRightWidth: 1,
+  },
+  bottomSheetHeader: {
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  bottomSheetKnob: {
+    width: 40,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: '#3a3a40',
+    marginBottom: 12,
+  },
+  bottomSheetTitle: {
+    color: '#fff',
+    fontSize: 15,
+    fontWeight: 'bold',
+  },
+  bottomSheetItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 15,
+    borderBottomWidth: 1,
+    borderBottomColor: '#25252a',
+  },
+  bottomSheetIconContainer: {
+    width: 36,
+    height: 36,
+    borderRadius: 10,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 14,
+  },
+  bottomSheetItemText: {
+    color: '#fff',
+    fontSize: 15,
+    fontWeight: '600',
+  },
+  bottomSheetCancelBtn: {
+    height: 50,
+    borderRadius: 12,
+    backgroundColor: '#2A2A30',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  bottomSheetCancelText: {
+    color: '#fff',
+    fontSize: 15,
     fontWeight: 'bold',
   }
 });
