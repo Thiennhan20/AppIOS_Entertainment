@@ -6,7 +6,7 @@ import { styles } from '../homeStyles';
 
 type Props = {
   section: any;
-  renderMovieCard: (item: any, isTV: boolean, isHistory: boolean, isWatchlist: boolean, index: number) => React.ReactElement;
+  renderMovieCard: (item: any, isTV: boolean, isHistory: boolean, index: number) => React.ReactElement;
 };
 
 export default function MovieRowSection({ section, renderMovieCard }: Props) {
@@ -19,7 +19,7 @@ export default function MovieRowSection({ section, renderMovieCard }: Props) {
         contentContainerStyle={styles.row}
         data={section.data}
         keyExtractor={(item, idx) => `${item.id || item.contentId}-${idx}`}
-        renderItem={({ item, index }) => renderMovieCard(item, section.isTV, section.isHistory, section.isWatchlist, index)}
+        renderItem={({ item, index }) => renderMovieCard(item, section.isTV, section.isHistory, index)}
         initialNumToRender={4}
         maxToRenderPerBatch={4}
         windowSize={3}

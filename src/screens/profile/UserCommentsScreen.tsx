@@ -43,7 +43,6 @@ export default function UserCommentsScreen({ navigation }: any) {
         setPage(pageNum);
       }
     } catch (err) {
-      console.warn('Error fetching user comments', err);
     } finally {
       setLoading(false);
       setLoadingMore(false);

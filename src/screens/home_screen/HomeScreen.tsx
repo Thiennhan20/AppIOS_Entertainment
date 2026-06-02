@@ -2,7 +2,7 @@ import { useTranslation } from 'react-i18next';
 import React, { useEffect, useState, useCallback, useMemo } from 'react';
 import { 
   StyleSheet, Text, View, FlatList,
-  TouchableOpacity, Dimensions, ActivityIndicator,
+  TouchableOpacity, Dimensions,
   RefreshControl, Modal, Animated,
 } from 'react-native';
 import { Image } from 'expo-image';
@@ -25,16 +25,21 @@ import useScrollToTop from '../../hooks/useScrollToTop';
 
 // ─── Local imports ───────────────────────────────────────────────────────────
 import { styles } from './homeStyles';
-import { TOP_CAST_DATA } from './utils';
 import SideMenu from './SideMenu';
 import HomeScreenSkeleton from './HomeScreenSkeleton';
 import MovieRowSection from './sections/MovieRowSection';
-import Top10Section from './sections/Top10Section';
 import WatchPartiesSection from './sections/WatchPartiesSection';
-import TopCastSection from './sections/TopCastSection';
 import ComingSoonSection from './sections/ComingSoonSection';
-import AiPicksSection from './sections/AiPicksSection';
 import { TopCommentsSection, RecentCommentsSection } from './sections/CommentsSection';
+import {
+  EntertainmentSection,
+  FeaturedActorsSection,
+  FrameRowSection,
+  HomeCTASection,
+  RankedPosterSection,
+  AnimeHeroSection,
+  Romance3DSection,
+} from './sections/HomeFrameSections';
 
 const { width, height } = Dimensions.get('window');
 const DEFAULT_FEATURED = require('../../../assets/splash-icon.png');
@@ -48,17 +53,33 @@ export default function HomeScreen({ navigation }: any) {
 
   // ─── State ─────────────────────────────────────────────────────────────────
   const [recentlyWatched, setRecentlyWatched] = useState<any[]>([]);
-  const [watchlist, setWatchlist] = useState<any[]>([]);
   const [activeRooms, setActiveRooms] = useState<any[]>([]);
   
   const [trendingMovies, setTrendingMovies] = useState<any[]>([]);
   const [trendingTV,     setTrendingTV]     = useState<any[]>([]);
-  const [topRated,       setTopRated]       = useState<any[]>([]);
   const [upcoming,       setUpcoming]       = useState<any[]>([]);
   const [actionMovies,   setActionMovies]   = useState<any[]>([]);
   const [anime,          setAnime]          = useState<any[]>([]);
   const [horrorMovies,   setHorrorMovies]   = useState<any[]>([]);
   const [romanceMovies,  setRomanceMovies]  = useState<any[]>([]);
+  const [koreanItems,    setKoreanItems]    = useState<any[]>([]);
+  const [usukItems,      setUsukItems]      = useState<any[]>([]);
+  const [chinaItems,     setChinaItems]     = useState<any[]>([]);
+  const [topMoviesToday, setTopMoviesToday] = useState<any[]>([]);
+  const [topTVToday,     setTopTVToday]     = useState<any[]>([]);
+  const [featuredActors, setFeaturedActors] = useState<any[]>([]);
+
+  // Track visible sections to pause background timers when off-screen
+  const [visibleSections, setVisibleSections] = useState<string[]>([]);
+
+  const onViewableItemsChanged = React.useRef(({ viewableItems }: any) => {
+    const ids = viewableItems.map((v: any) => v.item?.id).filter(Boolean);
+    setVisibleSections(ids);
+  }).current;
+
+  const viewabilityConfig = React.useRef({
+    viewAreaCoveragePercentThreshold: 20,
+  }).current;
 
   const [featuredList,   setFeaturedList]   = useState<any[]>([]);
   const [featuredIdx,    setFeaturedIdx]    = useState(0);
@@ -88,9 +109,6 @@ export default function HomeScreen({ navigation }: any) {
   const [refreshing,     setRefreshing]     = useState(false);
   const [menuVisible,    setMenuVisible]    = useState(false);
 
-  const [phase2Loaded,   setPhase2Loaded]   = useState(false);
-  const [loadingPhase2,  setLoadingPhase2]  = useState(false);
-
   const [activeTrailerKey, setActiveTrailerKey] = useState<string | null>(null);
   const [showTrailer, setShowTrailer] = useState(false);
   const [longPressedMovie, setLongPressedMovie] = useState<any>(null);
@@ -112,19 +130,14 @@ export default function HomeScreen({ navigation }: any) {
         showToast(t('home.trailer_not_available'), 'info');
       }
     } catch (err) {
-      console.log(err);
       showToast(t('home.cannot_load_trailer'), 'error');
     }
   };
 
   const fetchUserData = async () => {
     try {
-      const [histResp, watchResp] = await Promise.all([
-        authApi.getRecentlyWatched(),
-        authApi.getWatchlist()
-      ]);
+      const histResp = await authApi.getRecentlyWatched();
       setRecentlyWatched((histResp as any)?.items || []);
-      setWatchlist((watchResp as any)?.watchlist || []);
     } catch {
       // User might not be logged in or error
     }
@@ -138,20 +151,57 @@ export default function HomeScreen({ navigation }: any) {
 
   const fetchData = async () => {
     try {
-      const [movieData, tvData, roomsData] = await Promise.all([
-        tmdbApi.getTrendingMovies(),
-        tmdbApi.getTrendingTV(),
-        roomApi.getActiveRooms().catch(() => ({ rooms: [] }))
+      const [movieData, tvData, homeData, regionalData, frameFallbackData] = await Promise.all([
+        tmdbApi.getTrendingMovies().catch(() => ({ results: [] })),
+        tmdbApi.getTrendingTV().catch(() => ({ results: [] })),
+        tmdbApi.getHomeBundle().catch(() => ({ sections: {} })),
+        Promise.all([
+          tmdbApi.getKoreanContent().catch(() => []),
+          tmdbApi.getUSUKContent().catch(() => []),
+          tmdbApi.getChinaContent().catch(() => []),
+        ]),
+        Promise.all([
+          tmdbApi.getUpcomingContent().catch(() => []),
+          tmdbApi.getAnimeContent().catch(() => []),
+          tmdbApi.getActionContent().catch(() => []),
+          tmdbApi.getHorrorContent().catch(() => []),
+          tmdbApi.getRomanceContent().catch(() => []),
+        ]),
       ]);
-      const movies = (movieData as any)?.results || [];
-      const tv = (tvData as any)?.results || [];
-      const rooms = (roomsData as any)?.rooms || [];
+      const homeSections = (homeData as any)?.sections || {};
+      const [fallbackKorean, fallbackUSUK, fallbackChina] = regionalData as any[];
+      const [fallbackUpcoming, fallbackAnime, fallbackAction, fallbackHorror, fallbackRomance] = frameFallbackData as any[];
+      const featuredMovies = (movieData as any)?.results || [];
+      const featuredTV = (tvData as any)?.results || [];
+      const movies = homeSections.trendingMovies?.length ? homeSections.trendingMovies : featuredMovies;
+      const tv = homeSections.trendingTV?.length ? homeSections.trendingTV : featuredTV;
+      const actorData = homeSections.actors?.length
+        ? homeSections.actors
+        : await tmdbApi.getFeaturedActorsFromContent([...movies.slice(0, 3), ...tv.slice(0, 2)]).catch(() => []);
       
       setTrendingMovies(movies);
       setTrendingTV(tv);
-      setActiveRooms(rooms);
+      setUpcoming(homeSections.comingSoon?.length ? homeSections.comingSoon : fallbackUpcoming);
+      setActionMovies(homeSections.action?.length ? homeSections.action : fallbackAction);
+      setAnime(homeSections.anime?.length ? homeSections.anime : fallbackAnime);
+      setHorrorMovies(homeSections.horror?.length ? homeSections.horror : fallbackHorror);
+      setRomanceMovies(homeSections.romance?.length ? homeSections.romance : fallbackRomance);
+      setKoreanItems(homeSections.korean?.length ? homeSections.korean : fallbackKorean);
+      setUsukItems(homeSections.usuk?.length ? homeSections.usuk : fallbackUSUK);
+      setChinaItems(homeSections.china?.length ? homeSections.china : fallbackChina);
+      setTopMoviesToday(homeSections.topMovies?.length ? homeSections.topMovies : featuredMovies.slice(0, 5));
+      setTopTVToday(homeSections.topTVShows?.length ? homeSections.topTVShows : featuredTV.slice(0, 5));
+      setFeaturedActors(actorData);
 
-      if (movies.length >= 3 && tv.length >= 2) {
+      if (featuredMovies.length >= 3 && featuredTV.length >= 2) {
+        setFeaturedList([
+          { ...featuredMovies[0], isTV: false },
+          { ...featuredMovies[1], isTV: false },
+          { ...featuredMovies[2], isTV: false },
+          { ...featuredTV[0], isTV: true },
+          { ...featuredTV[1], isTV: true }
+        ]);
+      } else if (movies.length >= 3 && tv.length >= 2) {
         setFeaturedList([
           { ...movies[0], isTV: false },
           { ...movies[1], isTV: false },
@@ -161,50 +211,20 @@ export default function HomeScreen({ navigation }: any) {
         ]);
       }
     } catch (e) {
-      console.warn('Phase 1 err:', e);
+      // Phase 1 fetch error
     } finally {
       setLoading(false);
       setRefreshing(false);
     }
   };
 
-  const fetchPhase2 = async () => {
-    if (phase2Loaded || loadingPhase2) return;
-    setLoadingPhase2(true);
+  const fetchRoomsData = async () => {
     try {
-      const [topData, upcomingData, actionData, animeData, horrorData, romanceData] = await Promise.all([
-        tmdbApi.getTopRatedMovies(),
-        tmdbApi.getUpcomingMovies(),
-        tmdbApi.getActionMovies(),
-        tmdbApi.getAnime(),
-        tmdbApi.getHorrorMovies(),
-        tmdbApi.getRomanceMovies(),
-      ]);
-      
-      const top = (topData as any)?.results || [];
-      const upData  = (upcomingData as any)?.results || [];
-      const up = upData.filter((movie: any) => {
-        if (!movie.release_date) return false;
-        const movieReleaseDate = new Date(movie.release_date);
-        const currentDateObj = new Date();
-        currentDateObj.setHours(0,0,0,0);
-        return movieReleaseDate >= currentDateObj;
-      });
-
-      const action  = (actionData as any)?.results || [];
-      const ani     = (animeData  as any)?.results || [];
-      const horror  = (horrorData as any)?.results || [];
-      const romance = (romanceData as any)?.results || [];
-
-      setTopRated(top);
-      setUpcoming(up);
-      setActionMovies(action);
-      setAnime(ani);
-      setHorrorMovies(horror);
-      setRomanceMovies(romance);
-      setPhase2Loaded(true);
-    } catch (e) { console.warn('Phase 2 err:', e); } 
-      finally { setLoadingPhase2(false); }
+      const roomsData = await roomApi.getPublicRooms();
+      setActiveRooms((roomsData as any)?.rooms || []);
+    } catch (e) {
+      // Rooms fetch error
+    }
   };
 
   const startCarousel = () => {
@@ -214,49 +234,70 @@ export default function HomeScreen({ navigation }: any) {
     }, 6000);
   };
 
-  const fetchCommentsData = async () => {
-    try {
-      const [top, recent] = await Promise.all([
-        commentsApi.getTopComments(10),
-        commentsApi.getRecentComments(10)
-      ]);
-      
-      const tItems = top || [];
-      const rItems = recent || [];
-      const cache = new Map();
+  const enrichComments = async (items: any[]) => {
+    const cache = new Map();
 
-      const enrich = async (item: any) => {
-        const key = `${item.type}-${item.movieId}`;
-        if (!cache.has(key)) {
-          const p = item.type === 'tv' || item.type === 'tvshow' 
-            ? tmdbApi.getTVDetail(item.movieId)
-            : tmdbApi.getMovieDetail(item.movieId);
-          cache.set(key, p.catch(() => null));
-        }
-        
-        const detail = await cache.get(key);
-        return {
-          ...item,
-          movieTitle: detail?.title || detail?.name || t('general.unknown'),
-          moviePoster: detail?.poster_path ? `https://image.tmdb.org/t/p/w200${detail.poster_path}` : null,
-        };
+    const enrich = async (item: any) => {
+      const key = `${item.type}-${item.movieId}`;
+      if (!cache.has(key)) {
+        const p = item.type === 'tv' || item.type === 'tvshow'
+          ? tmdbApi.getTVDetail(item.movieId)
+          : tmdbApi.getMovieDetail(item.movieId);
+        cache.set(key, p.catch(() => null));
+      }
+
+      const detail = await cache.get(key);
+      return {
+        ...item,
+        movieTitle: detail?.title || detail?.name || t('general.unknown'),
+        moviePoster: detail?.poster_path ? `https://image.tmdb.org/t/p/w200${detail.poster_path}` : null,
       };
+    };
 
-      const [enrichedTop, enrichedRecent] = await Promise.all([
-        Promise.all(tItems.map(enrich)),
-        Promise.all(rItems.map(enrich))
-      ]);
+    return Promise.all((items || []).map(enrich));
+  };
 
+  const fetchTopCommentsData = async () => {
+    try {
+      const top = await commentsApi.getTopComments(10);
+      const enrichedTop = await enrichComments(top || []);
       setTopComments(enrichedTop);
-      setRecentComments(enrichedRecent);
     } catch (e) {
-      console.warn('Comments fetch err:', e);
+      // Top comments fetch error
     }
   };
 
+  const fetchRecentCommentsData = async () => {
+    try {
+      const recent = await commentsApi.getRecentComments(10);
+      const enrichedRecent = await enrichComments(recent || []);
+      setRecentComments(enrichedRecent);
+    } catch (e) {
+      // Recent comments fetch error
+    }
+  };
+
+  const fetchCommentsData = async () => {
+    await Promise.all([
+      fetchTopCommentsData(),
+      fetchRecentCommentsData(),
+    ]);
+  };
+
   useEffect(() => {
-    fetchData(); 
+    fetchData();
+    fetchRoomsData();
     fetchCommentsData();
+
+    const roomsInterval = setInterval(fetchRoomsData, 30000);
+    const recentCommentsInterval = setInterval(fetchRecentCommentsData, 120000);
+    const topCommentsInterval = setInterval(fetchTopCommentsData, 300000);
+
+    return () => {
+      clearInterval(roomsInterval);
+      clearInterval(recentCommentsInterval);
+      clearInterval(topCommentsInterval);
+    };
   }, []);
 
   useEffect(() => {
@@ -275,21 +316,25 @@ export default function HomeScreen({ navigation }: any) {
 
   const onRefresh = () => { 
     setRefreshing(true); 
+    tmdbApi.clearCache();
+    commentsApi.clearHomeCache();
+    roomApi.clearPublicRoomsCache();
     fetchData(); 
-    fetchUserData(); 
+    fetchUserData();
+    fetchRoomsData();
     fetchCommentsData();
   };
 
   // ─── Render helpers ────────────────────────────────────────────────────────
-  const renderMovieCard = useCallback((item: any, isTV = false, isHistory = false, isWatchlist = false, index: number) => {
+  const renderMovieCard = useCallback((item: any, isTV = false, isHistory = false, index = 0) => {
     const title = item.title || item.name;
-    const navItem = isHistory || isWatchlist ? {
+    const navItem = isHistory ? {
       ...item,
       id: item.contentId || item.id,
       title: title,
-      poster_path: isHistory ? item.poster?.replace('https://image.tmdb.org/t/p/w400', '') : item.poster_path,
+      poster_path: item.poster?.replace('https://image.tmdb.org/t/p/w400', ''),
     } : item;
-    const navIsTV = isHistory ? item.isTVShow : (isWatchlist ? (item.type === 'tv') : isTV);
+    const navIsTV = isHistory ? item.isTVShow : isTV;
 
     const handleLongPressMovie = () => {
       setLongPressedMovie({ ...navItem, isTV: navIsTV });
@@ -365,31 +410,6 @@ export default function HomeScreen({ navigation }: any) {
       );
     }
 
-    // Watchlist
-    if (isWatchlist) {
-      const imgUri = item.poster_path ? `https://image.tmdb.org/t/p/w200${item.poster_path}` : null;
-      return (
-        <TouchableOpacity 
-          style={styles.watchlistCard}
-          onPress={() => navigation.navigate('DetailScreen', { item: navItem, isTV: navIsTV })}
-          onLongPress={handleLongPressMovie}
-          delayLongPress={400}
-          activeOpacity={0.8}
-        >
-          {imgUri ? (
-            <Image source={{ uri: imgUri }} style={styles.moviePoster} />
-          ) : (
-            <View style={[styles.moviePoster, styles.placeholderCard]}>
-              <Text style={{ color: '#fff', textAlign: 'center', fontSize: 12 }}>{title}</Text>
-            </View>
-          )}
-          <View style={styles.watchlistBadge} pointerEvents="none">
-             <Ionicons name="bookmark" size={16} color="#0f0f13" />
-          </View>
-        </TouchableOpacity>
-      );
-    }
-
     // Default movie card
     const originalPoster = item.poster_path ? `https://image.tmdb.org/t/p/w200${item.poster_path}` : null;
     return (
@@ -420,36 +440,61 @@ export default function HomeScreen({ navigation }: any) {
   const prevImageUri = prevFeatured?.poster_path
     ? `https://image.tmdb.org/t/p/w780${prevFeatured.poster_path}` : null;
 
-  const topCast = useMemo(() => TOP_CAST_DATA, []);
-
   const finalSections = useMemo(() => {
+    const mixedLabels = {
+      movieLabel: t('home.movie_label'),
+      tvLabel: t('home.tv_show_label'),
+    };
+
     const baseSections: any[] = [
       { id: 'featured', type: 'FEATURED' },
+      { id: 'history', label: t('home.continue_watching'), data: recentlyWatched, type: 'MOVIE_ROW', isTV: false, isHistory: true },
       { id: 'watch_parties', label: t('home.watch_parties'), data: activeRooms, type: 'WATCH_PARTIES' },
-      { id: 'trending_movies', label: t('home.top10_trending'), data: trendingMovies.slice(0, 10), type: 'TOP_10', isTV: false, isHistory: false, isWatchlist: false },
-      { id: 'history', label: `▶️ ${t('home.continue_watching')}`, data: recentlyWatched, type: 'MOVIE_ROW', isTV: false, isHistory: true, isWatchlist: false },
-      { id: 'top_cast', label: t('home.top_cast'), data: topCast, type: 'TOP_CAST' },
-      { id: 'ai_picks', label: t('home.ai_picks'), data: topRated.slice(0, 10), type: 'AI_PICKS', isTV: false },
-      { id: 'trending_tv', label: t('home.top_tv_shows'), data: trendingTV.slice(0, 10), type: 'MOVIE_ROW', isTV: true, isHistory: false, isWatchlist: false },
-      { id: 'watchlist_row', label: t('home.your_watchlist'), data: watchlist, type: 'MOVIE_ROW', isTV: false, isHistory: false, isWatchlist: true },
+      { id: 'korean', label: t('home.korean_title'), data: koreanItems, type: 'FRAME_ROW', accent: '#EC4899', ...mixedLabels },
+      { id: 'usuk', label: t('home.usuk_title'), data: usukItems, type: 'FRAME_ROW', accent: '#4F46E5', ...mixedLabels },
+      { id: 'china', label: t('home.china_title'), data: chinaItems, type: 'FRAME_ROW', accent: '#EF4444', ...mixedLabels },
       { id: 'top_comments', type: 'TOP_COMMENTS', data: topComments },
       { id: 'recent_comments', type: 'RECENT_COMMENTS', data: recentComments },
+      { id: 'top_movies', label: t('home.top_movies_today'), data: topMoviesToday, type: 'RANKED_POSTERS', isTV: false, accent: '#F97316' },
+      { id: 'upcoming', label: t('home.coming_soon_section'), data: upcoming, type: 'COMING_SOON', isTV: false, isHistory: false },
+      { id: 'top_tv', label: t('home.top_tv_today'), data: topTVToday, type: 'RANKED_POSTERS', isTV: true, accent: '#38BDF8' },
+      { id: 'anime', label: t('home.anime_title'), data: anime, type: 'ANIME_HERO', accent: '#6366F1', ...mixedLabels },
+      { id: 'action', label: t('home.action_title'), data: actionMovies, type: 'FRAME_ROW', accent: '#F97316', ...mixedLabels },
+      { id: 'horror', label: t('home.horror_title'), data: horrorMovies, type: 'FRAME_ROW', accent: '#71717A', ...mixedLabels },
+      { id: 'romance', label: t('home.romance_title'), data: romanceMovies, type: 'ROMANCE_3D', accent: '#FB7185', ...mixedLabels },
+      { id: 'actors', label: t('home.actors_title'), data: featuredActors, type: 'ACTORS', accent: '#FACC15', actorLabel: t('home.acting_label') },
+      { id: 'entertainment', label: t('home.entertainment_title'), type: 'ENTERTAINMENT', accent: '#A855F7', data: { movie: topMoviesToday[0], tv: topTVToday[0] } },
+      { id: 'cta', label: t('home.home_cta_title'), subtitle: t('home.home_cta_subtitle'), type: 'CTA' },
     ];
 
-    if (phase2Loaded) {
-      baseSections.push(
-        { id: 'upcoming', label: t('home.coming_soon_section'), data: upcoming, type: 'COMING_SOON', isTV: false, isHistory: false, isWatchlist: false },
-        { id: 'action', label: t('home.action_adrenaline'), data: actionMovies, type: 'MOVIE_ROW', isTV: false, isHistory: false, isWatchlist: false },
-        { id: 'anime', label: t('home.anime_world'), data: anime, type: 'MOVIE_ROW', isTV: true, isHistory: false, isWatchlist: false },
-        { id: 'horror', label: t('home.horror_night'), data: horrorMovies, type: 'MOVIE_ROW', isTV: false, isHistory: false, isWatchlist: false },
-        { id: 'romance', label: t('home.romance_rain'), data: romanceMovies, type: 'MOVIE_ROW', isTV: false, isHistory: false, isWatchlist: false }
-      );
-    }
-
-    return baseSections.filter(s => s.type === 'FEATURED' || (s.data && s.data.length > 0));
-  }, [trendingMovies, trendingTV, recentlyWatched, watchlist, topComments, recentComments, upcoming, actionMovies, anime, horrorMovies, romanceMovies, topRated, phase2Loaded, t]);
+    return baseSections.filter((section) => {
+      if (section.type === 'FEATURED' || section.type === 'ENTERTAINMENT' || section.type === 'CTA') return true;
+      return section.data && section.data.length > 0;
+    });
+  }, [
+    activeRooms,
+    recentlyWatched,
+    topComments,
+    recentComments,
+    koreanItems,
+    usukItems,
+    chinaItems,
+    topMoviesToday,
+    upcoming,
+    topTVToday,
+    anime,
+    actionMovies,
+    horrorMovies,
+    romanceMovies,
+    featuredActors,
+    t,
+  ]);
 
   // ─── Section renderer ──────────────────────────────────────────────────────
+  const handleFrameLongPress = useCallback((item: any, isTV: boolean) => {
+    setLongPressedMovie({ ...item, isTV });
+  }, []);
+
   const renderHomeSection = useCallback(({ item: section }: any) => {
     if (section.type === 'FEATURED') {
       return (
@@ -472,7 +517,7 @@ export default function HomeScreen({ navigation }: any) {
           />
           <View style={styles.featuredContent}>
             <Animated.Text style={[styles.featuredCategory, { opacity: fadeAnim }]}>
-              {currentFeatured?.isTV ? 'TV Series' : 'Movie'} • {currentFeatured?.original_language === 'en' ? 'Hollywood' : 'International'}
+              {currentFeatured?.isTV ? t('home.tv_show_label') : t('home.movie_label')} • {currentFeatured?.original_language === 'en' ? t('home.hollywood') : t('home.international')}
             </Animated.Text>
             <View style={styles.featuredActions}>
               <WatchlistButton 
@@ -523,16 +568,22 @@ export default function HomeScreen({ navigation }: any) {
     }
 
     if (section.type === 'MOVIE_ROW') return <MovieRowSection section={section} renderMovieCard={renderMovieCard} />;
-    if (section.type === 'TOP_10') return <Top10Section section={section} navigation={navigation} />;
     if (section.type === 'WATCH_PARTIES') return <WatchPartiesSection section={section} navigation={navigation} />;
-    if (section.type === 'TOP_CAST') return <TopCastSection section={section} />;
+    const isActive = visibleSections.includes(section.id);
+
+    if (section.type === 'FRAME_ROW') return <FrameRowSection section={section} navigation={navigation} onLongPressMovie={handleFrameLongPress} />;
+    if (section.type === 'ANIME_HERO') return <AnimeHeroSection section={section} navigation={navigation} onLongPressMovie={handleFrameLongPress} isActive={isActive} />;
+    if (section.type === 'ROMANCE_3D') return <Romance3DSection section={section} navigation={navigation} onLongPressMovie={handleFrameLongPress} isActive={isActive} />;
+    if (section.type === 'RANKED_POSTERS') return <RankedPosterSection section={section} navigation={navigation} onLongPressMovie={handleFrameLongPress} />;
+    if (section.type === 'ACTORS') return <FeaturedActorsSection section={section} />;
+    if (section.type === 'ENTERTAINMENT') return <EntertainmentSection section={section} navigation={navigation} />;
+    if (section.type === 'CTA') return <HomeCTASection section={section} />;
     if (section.type === 'COMING_SOON') return <ComingSoonSection section={section} navigation={navigation} />;
-    if (section.type === 'AI_PICKS') return <AiPicksSection section={section} renderMovieCard={renderMovieCard} />;
     if (section.type === 'TOP_COMMENTS') return <TopCommentsSection data={section.data} navigation={navigation} />;
-    if (section.type === 'RECENT_COMMENTS') return <RecentCommentsSection data={section.data} navigation={navigation} />;
+    if (section.type === 'RECENT_COMMENTS') return <RecentCommentsSection data={section.data} navigation={navigation} isActive={isActive} />;
 
     return null;
-  }, [featuredList, featuredIdx, prevFeaturedIdx, fadeAnim, currentFeatured, prevFeatured, featuredImageUri, prevImageUri, themeColor, themeGradient, renderMovieCard, navigation, t]);
+  }, [featuredList, featuredIdx, prevFeaturedIdx, fadeAnim, currentFeatured, prevFeatured, featuredImageUri, prevImageUri, themeColor, themeGradient, renderMovieCard, navigation, t, handleFrameLongPress, visibleSections]);
 
   // ─── Render ────────────────────────────────────────────────────────────────
   if (loading) {
@@ -583,6 +634,8 @@ export default function HomeScreen({ navigation }: any) {
         data={finalSections}
         keyExtractor={(item) => item.id}
         renderItem={renderHomeSection}
+        onViewableItemsChanged={onViewableItemsChanged}
+        viewabilityConfig={viewabilityConfig}
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{ paddingBottom: 60 }}
         refreshControl={
@@ -592,9 +645,6 @@ export default function HomeScreen({ navigation }: any) {
         initialNumToRender={5}
         maxToRenderPerBatch={3}
         windowSize={5}
-        onEndReached={fetchPhase2}
-        onEndReachedThreshold={0.5}
-        ListFooterComponent={loadingPhase2 ? <View style={{ height: 200, justifyContent: 'center' }}><ActivityIndicator size="large" color={themeColor} /><Text style={{color: 'gray', textAlign: 'center', marginTop: 10}}>{t('home.loading_more')}</Text></View> : null}
       />
 
       {/* Trailer Modal */}

@@ -6,6 +6,11 @@ import * as AuthSession from 'expo-auth-session';
 import * as WebBrowser from 'expo-web-browser';
 import { Linking } from 'react-native';
 import { CONFIG } from '../constants/config';
+import {
+  registerForPushNotificationsAsync,
+  registerTokenWithServer,
+  deregisterTokenFromServer,
+} from '../services/pushNotifications';
 
 WebBrowser.maybeCompleteAuthSession();
 
@@ -16,6 +21,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [loading, setLoading] = useState(true);
   const [entryTransitionId, setEntryTransitionId] = useState(0);
   const lastTransitionToken = useRef<string | null>(null);
+  const pushTokenRef = useRef<string | null>(null);
 
   useEffect(() => {
     const restoreSession = async () => {
@@ -47,6 +53,13 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         // Có token, đi fetch data user thật
         const data = await authApi.getProfile();
         setUser(data.user);
+        // Register push token silently in the background
+        registerForPushNotificationsAsync().then((expoPushToken) => {
+          if (expoPushToken) {
+            pushTokenRef.current = expoPushToken;
+            registerTokenWithServer(expoPushToken).catch(() => {});
+          }
+        }).catch(() => {});
       }
     } catch (err) {
       // Token hết hạn or sai
@@ -86,12 +99,25 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     setEntryTransitionId((current) => current + 1);
   };
 
+  const setupPushNotifications = async () => {
+    try {
+      const expoPushToken = await registerForPushNotificationsAsync();
+      if (expoPushToken) {
+        pushTokenRef.current = expoPushToken;
+        await registerTokenWithServer(expoPushToken);
+      }
+    } catch {
+      // Best-effort push registration
+    }
+  };
+
   const saveAuthenticatedSession = async (token: string, animateEntry = false) => {
     await AsyncStorage.setItem('@auth_token', token);
     const data = await authApi.getProfile();
     clearWatchlistCache();
     setUser(data.user);
     if (animateEntry) requestEntryTransition(token);
+    setupPushNotifications();
   };
 
   const completeGoogleCallback = async (url: string) => {
@@ -159,6 +185,15 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       } catch {
         // Best effort
       }
+    }
+    // Deregister push token before clearing auth session
+    if (pushTokenRef.current) {
+      try {
+        await deregisterTokenFromServer(pushTokenRef.current);
+      } catch {
+        // Best effort
+      }
+      pushTokenRef.current = null;
     }
     await authApi.logout();
     await AsyncStorage.removeItem('@auth_token');

@@ -39,7 +39,6 @@ export default function UserListScreen({ route, navigation }: any) {
         setData(resp.items || []);
       }
     } catch (err) {
-      console.warn(err);
     } finally {
       setLoading(false);
     }

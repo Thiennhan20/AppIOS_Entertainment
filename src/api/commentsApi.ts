@@ -1,7 +1,7 @@
 import axios from 'axios';
 import { CONFIG } from '../constants/config';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { useTranslation } from 'react-i18next';
+import apiCache, { buildApiCacheKey, CACHE_TTL } from '../utils/apiCache';
 
 const commentsClient = axios.create({
   baseURL: `${CONFIG.API_BASE_URL}/api`,
@@ -18,12 +18,18 @@ commentsClient.interceptors.request.use(async (config) => {
 
 export const commentsApi = {
   getTopComments: async (limit: number = 10) => {
-    const response = await commentsClient.get('/comments/top', { params: { limit } });
-    return response.data.data;
+    const cacheKey = buildApiCacheKey('comments', 'top', { limit });
+    return apiCache.getOrSet(cacheKey, async () => {
+      const response = await commentsClient.get('/comments/top', { params: { limit } });
+      return response.data.data;
+    }, CACHE_TTL.TOP_COMMENTS);
   },
   getRecentComments: async (limit: number = 10) => {
-    const response = await commentsClient.get('/comments/recent', { params: { limit } });
-    return response.data.data;
+    const cacheKey = buildApiCacheKey('comments', 'recent', { limit });
+    return apiCache.getOrSet(cacheKey, async () => {
+      const response = await commentsClient.get('/comments/recent', { params: { limit } });
+      return response.data.data;
+    }, CACHE_TTL.RECENT_COMMENTS);
   },
   getUserComments: async (page: number = 1, limit: number = 10, filter: string = 'comments') => {
     const response = await commentsClient.get('/comments/user/me', { params: { page, limit, filter } });
@@ -48,5 +54,6 @@ export const commentsApi = {
   deleteComment: async (commentId: string) => {
     const response = await commentsClient.delete(`/comments/${commentId}`);
     return response.data;
-  }
+  },
+  clearHomeCache: () => apiCache.clearByPrefix('comments:'),
 };

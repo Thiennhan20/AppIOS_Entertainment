@@ -12,8 +12,38 @@ apiClient.interceptors.request.use(async (config) => {
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
   }
+
   return config;
 });
+
+apiClient.interceptors.response.use(
+  (response) => response,
+  async (error) => {
+    const originalConfig = error.config as any;
+
+    if (!error.response && originalConfig && !originalConfig.__localApiRetryDone) {
+      originalConfig.__localApiRetryDone = true;
+      const currentBaseUrl = String(originalConfig.baseURL || '').replace(/\/api\/?$/, '');
+
+      for (const candidate of CONFIG.API_BASE_URL_CANDIDATES) {
+        if (candidate === currentBaseUrl) continue;
+
+        try {
+          return await apiClient.request({
+            ...originalConfig,
+            baseURL: `${candidate}/api`,
+          });
+        } catch (retryError: any) {
+          if (retryError.response) {
+            throw retryError;
+          }
+        }
+      }
+    }
+
+    return Promise.reject(error);
+  },
+);
 
 export const authApi = {
   login: async (email: string, password: string) => {

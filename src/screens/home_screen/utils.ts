@@ -10,11 +10,3 @@ export const getTimeSince = (dateString: string, t: any) => {
   const days = Math.floor(hours / 24);
   return `${days} ${t('home.days_ago')}`;
 };
-
-export const TOP_CAST_DATA = [
-  { id: '1', name: 'Tom Cruise', image: 'https://image.tmdb.org/t/p/w200/gThaIXgpBVyBb2sM070Wj8Jm4G5.jpg' },
-  { id: '2', name: 'Scarlett Johansson', image: 'https://image.tmdb.org/t/p/w200/60Zrsx4U43z8GtyBpmKjK3nU8pM.jpg' },
-  { id: '3', name: 'Leonardo DiCaprio', image: 'https://image.tmdb.org/t/p/w200/wo2hJpn04vbtmh0B9utCFdsQhxM.jpg' },
-  { id: '4', name: 'Cillian Murphy', image: 'https://image.tmdb.org/t/p/w200/i8d63evB4h6x1Rmbk1k7oHmbDDB.jpg' },
-  { id: '5', name: 'Margot Robbie', image: 'https://image.tmdb.org/t/p/w200/euDPyqLnuwaWmHutvn5IiY2Kj1.jpg' },
-];

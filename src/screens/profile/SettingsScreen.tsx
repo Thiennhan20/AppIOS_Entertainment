@@ -139,7 +139,6 @@ export default function SettingsScreen({ navigation }: any) {
         }
       }
     } catch (error) {
-      console.log('Error choosing avatar', error);
       showAlert(t('general.error') || 'Error', t('profile.error_choosing_image') || 'Error choosing image', true);
     }
   };

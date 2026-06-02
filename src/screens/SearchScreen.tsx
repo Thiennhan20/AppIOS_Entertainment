@@ -79,7 +79,6 @@ export default function SearchScreen({ navigation }: any) {
         
         setResults(mixed);
       } catch (err) {
-        console.warn(err);
       } finally {
         setLoading(false);
         setIsTyping(false);

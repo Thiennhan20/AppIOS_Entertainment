@@ -1,6 +1,7 @@
 import axios from 'axios';
 import { CONFIG } from '../constants/config';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import apiCache, { CACHE_TTL } from '../utils/apiCache';
 
 const apiClient = axios.create({
   baseURL: `${CONFIG.API_BASE_URL}/api/rooms`,
@@ -25,6 +26,13 @@ export const roomApi = {
     const response = await apiClient.get('/');
     return response.data;
   },
+
+  getPublicRooms: async () => {
+    return apiCache.getOrSet('rooms:public', async () => {
+      const response = await apiClient.get('/public');
+      return response.data;
+    }, CACHE_TTL.PUBLIC_ROOMS);
+  },
   
   getRoom: async (id: string) => {
     const response = await apiClient.get(`/${id}`);
@@ -39,5 +47,7 @@ export const roomApi = {
   updateStream: async (id: string, stream_url: string, title: string) => {
     const response = await apiClient.patch(`/${id}/stream`, { stream_url, title });
     return response.data;
-  }
+  },
+
+  clearPublicRoomsCache: () => apiCache.delete('rooms:public'),
 };

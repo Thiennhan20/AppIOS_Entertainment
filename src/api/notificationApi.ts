@@ -88,6 +88,16 @@ export const notificationApi = {
     const response = await notificationClient.patch('/notifications/read-all');
     return response.data;
   },
+
+  registerPushToken: async (token: string) => {
+    const response = await notificationClient.post('/notifications/register-push-token', { token });
+    return response.data;
+  },
+
+  deregisterPushToken: async (token: string) => {
+    const response = await notificationClient.post('/notifications/deregister-push-token', { token });
+    return response.data;
+  },
 };
 
 export function getNotificationSocketUrl() {

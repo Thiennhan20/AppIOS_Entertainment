@@ -105,7 +105,6 @@ export default function DetailScreenTVShow({ route, navigation }: any) {
           setTrailerKey(ytTrailer.key);
         }
       } catch (error) {
-        console.warn("Failed fetching metadata");
       }
     };
     fetchDetails();

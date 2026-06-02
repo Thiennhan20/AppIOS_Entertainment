@@ -32,7 +32,6 @@ export const nguoncApi = {
       
       return null;
     } catch (e) {
-      console.warn("Failed fetching from NguonC API", e);
       return null;
     }
   }

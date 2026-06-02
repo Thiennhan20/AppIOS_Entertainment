@@ -25,7 +25,6 @@ async function chatAIFetch(messages: any[], system: string = SYSTEM_PROMPT) {
 
     if (!response.ok) {
       const errorText = await response.text();
-      console.warn("ChatAI API Error:", errorText);
       throw new Error('ChatAI API error');
     }
 

@@ -85,7 +85,6 @@ export default function SearchResultScreen({ route, navigation }: any) {
         });
       }
     } catch (err) {
-      console.warn(err);
     } finally {
       setLoading(false);
       setLoadingMore(false);

@@ -120,7 +120,6 @@ export function useWatchPartySocket({
     socketRef.current = socket;
 
     socket.on('connect', () => {
-      console.log('[WP] Connected to /watch-party');
       setIsConnected(true);
 
       // Join room
@@ -134,7 +133,6 @@ export function useWatchPartySocket({
     });
 
     socket.on('disconnect', () => {
-      console.log('[WP] Disconnected');
       setIsConnected(false);
       if (heartbeatRef.current) clearInterval(heartbeatRef.current);
     });

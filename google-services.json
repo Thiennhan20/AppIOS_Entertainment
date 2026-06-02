@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "58384136016",
+    "project_id": "entertainment-ntn",
+    "storage_bucket": "entertainment-ntn.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:58384136016:android:1a5017cb4f52fda80b5e55",
+        "android_client_info": {
+          "package_name": "com.ntn.entertainment"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAzluu40VM2y2ijMIuNpJFepWDeeIM4UwA"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

@@ -31,7 +31,6 @@ const languageDetectorPlugin: any = {
         return callback('en');
       }
     } catch (error) {
-      console.log('Error reading language', error);
       callback('en');
     }
   },

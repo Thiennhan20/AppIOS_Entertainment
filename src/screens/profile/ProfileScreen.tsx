@@ -79,42 +79,18 @@ export default function ProfileScreen({ navigation }: any) {
       </View>
 
       <View style={styles.menuSection}>
+        <TouchableOpacity 
+          style={styles.menuItem} 
+          onPress={() => navigation.navigate('PersonalDashboardScreen')}
+        >
+          <Ionicons name="person-circle-outline" size={24} color="#ccc" style={styles.menuIcon} />
+          <Text style={styles.menuText}>{t('profile.my_profile')}</Text>
+          <Ionicons name="chevron-forward" size={20} color="#555" />
+        </TouchableOpacity>
+
         <TouchableOpacity style={styles.menuItem} onPress={() => navigation.navigate('SettingsScreen')}>
           <Ionicons name="settings-outline" size={24} color="#ccc" style={styles.menuIcon} />
           <Text style={styles.menuText}>{t('profile.account_settings')}</Text>
-          <Ionicons name="chevron-forward" size={20} color="#555" />
-        </TouchableOpacity>
-
-        <TouchableOpacity 
-          style={styles.menuItem}
-          onPress={() => navigation.navigate('UserListScreen', { type: 'watchlist' })}
-        >
-          <Ionicons name="bookmark-outline" size={24} color="#ccc" style={styles.menuIcon} />
-          <Text style={styles.menuText}>{t('profile.watchlist')}</Text>
-          <Ionicons name="chevron-forward" size={20} color="#555" />
-        </TouchableOpacity>
-
-        <TouchableOpacity 
-          style={styles.menuItem}
-          onPress={() => navigation.navigate('UserListScreen', { type: 'history' })}
-        >
-          <Ionicons name="time-outline" size={24} color="#ccc" style={styles.menuIcon} />
-          <Text style={styles.menuText}>{t('profile.watch_history')}</Text>
-          <Ionicons name="chevron-forward" size={20} color="#555" />
-        </TouchableOpacity>
-
-        <TouchableOpacity 
-          style={styles.menuItem}
-          onPress={() => navigation.navigate('UserCommentsScreen')}
-        >
-          <Ionicons name="chatbubbles-outline" size={24} color="#ccc" style={styles.menuIcon} />
-          <Text style={styles.menuText}>{t('profile.my_comments')}</Text>
-          <Ionicons name="chevron-forward" size={20} color="#555" />
-        </TouchableOpacity>
-
-        <TouchableOpacity style={styles.menuItem} onPress={() => navigation.navigate('FriendsScreen')}>
-          <Ionicons name="people-outline" size={24} color="#ccc" style={styles.menuIcon} />
-          <Text style={styles.menuText}>{t('friends.title')}</Text>
           <Ionicons name="chevron-forward" size={20} color="#555" />
         </TouchableOpacity>
 

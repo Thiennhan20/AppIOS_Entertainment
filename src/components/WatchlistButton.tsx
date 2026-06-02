@@ -60,7 +60,6 @@ export default function WatchlistButton({ movie, styleType = 'detail', onWatchli
         setIsSaved(refreshedWatchlist.has(String(movie.id)));
       }
     } catch (e) {
-      console.warn("Could not fetch watchlist state", e);
     } finally {
       setLoading(false);
     }

@@ -54,7 +54,6 @@ export default function ListScreen({ route, navigation }: any) {
         setData(prev => [...prev, ...validItems]);
       }
     } catch (err) {
-      console.warn(err);
     } finally {
       setLoading(false);
       setLoadingMore(false);

@@ -1,5 +1,6 @@
-import React from 'react';
-import { View, Text, TouchableOpacity, FlatList } from 'react-native';
+import React, { useEffect, useRef, useState } from 'react';
+import { View, Text, TouchableOpacity, FlatList, Dimensions } from 'react-native';
+const { width } = Dimensions.get('window');
 import { Image } from 'expo-image';
 import { Ionicons } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
@@ -87,17 +88,59 @@ export function TopCommentsSection({ data, navigation }: { data: any[]; navigati
   );
 }
 
-export function RecentCommentsSection({ data, navigation }: { data: any[]; navigation: any }) {
+export function RecentCommentsSection({ data, navigation, isActive = false }: { data: any[]; navigation: any; isActive?: boolean }) {
   const { t } = useTranslation();
+  const flatListRef = useRef<FlatList>(null);
+  const [currentIndex, setCurrentIndex] = useState(0);
+
+  // Auto-scroll loop every 4 seconds with precise scrollToOffset centering, ONLY when active/visible
+  useEffect(() => {
+    if (!isActive || !data || data.length <= 1) return;
+    const interval = setInterval(() => {
+      setCurrentIndex((prev) => {
+        const next = (prev + 1) % data.length;
+        const cardWidthWithMargin = 275;
+        const paddingLeft = 18;
+        const cardCenterAdjustment = (width - 260) / 2;
+        const targetOffset = Math.max(0, (cardWidthWithMargin * next + paddingLeft) - cardCenterAdjustment);
+
+        flatListRef.current?.scrollToOffset({
+          offset: targetOffset,
+          animated: true,
+        });
+        return next;
+      });
+    }, 4000);
+    return () => clearInterval(interval);
+  }, [isActive, data.length]);
+
   return (
     <View style={{ paddingBottom: 15 }}>
       <Text style={[styles.sectionTitle, { color: '#4da6ff' }]}>{t('home.fresh_comments')}</Text>
       <FlatList
+        ref={flatListRef}
         horizontal
         showsHorizontalScrollIndicator={false}
         contentContainerStyle={styles.row}
         data={data}
         keyExtractor={(item) => `recent-${item._id}`}
+        snapToInterval={275}
+        decelerationRate="fast"
+        getItemLayout={(data, index) => ({
+          length: 275,
+          offset: 275 * index + 18, // paddingHorizontal from styles.row (18px)
+          index,
+        })}
+        onScrollToIndexFailed={(info) => {
+          const wait = new Promise(resolve => setTimeout(resolve, 50));
+          wait.then(() => {
+            flatListRef.current?.scrollToIndex({
+              index: info.index,
+              animated: true,
+              viewPosition: 0.5,
+            });
+          });
+        }}
         renderItem={({ item }) => (
           <TouchableOpacity 
             style={styles.recentCommentCard}

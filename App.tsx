@@ -7,15 +7,35 @@ import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Ionicons } from '@expo/vector-icons';
 import { View, ActivityIndicator, AppState, UIManager, Platform, LogBox } from 'react-native';
 
+const shouldIgnoreLog = (message: any) => {
+  if (typeof message !== 'string') return false;
+  return (
+    message.includes('setLayoutAnimationEnabledExperimental') ||
+    message.includes('i18next is made possible') ||
+    message.includes('expo-notifications: Android Push notifications') ||
+    message.includes('functionality is not fully supported in Expo Go') ||
+    message.includes('Due to changes in Androids permission requirements')
+  );
+};
+
 LogBox.ignoreLogs([
   'setLayoutAnimationEnabledExperimental',
-  'i18next is made possible'
+  'i18next is made possible',
+  'expo-notifications: Android Push notifications',
+  'functionality is not fully supported in Expo Go',
+  'Due to changes in Androids permission requirements'
 ]);
 
 const originalWarn = console.warn;
 console.warn = (...args) => {
-  if (typeof args[0] === 'string' && args[0].includes('setLayoutAnimationEnabledExperimental')) return;
+  if (shouldIgnoreLog(args[0])) return;
   originalWarn(...args);
+};
+
+const originalError = console.error;
+console.error = (...args) => {
+  if (shouldIgnoreLog(args[0])) return;
+  originalError(...args);
 };
 
 const originalInfo = console.info || console.log;
@@ -56,6 +76,7 @@ import UserListScreen from './src/screens/profile/UserListScreen';
 import UserCommentsScreen from './src/screens/profile/UserCommentsScreen';
 import FriendsScreen from './src/screens/profile/FriendsScreen';
 import PublicProfileScreen from './src/screens/profile/PublicProfileScreen';
+import PersonalDashboardScreen from './src/screens/profile/PersonalDashboardScreen';
 
 import LoginScreen from './src/screens/auth/LoginScreen';
 import RegisterScreen from './src/screens/auth/RegisterScreen';
@@ -119,6 +140,7 @@ function ProfileStack() {
       }}
     >
       <Stack.Screen name="ProfileScreen" component={ProfileScreen} />
+      <Stack.Screen name="PersonalDashboardScreen" component={PersonalDashboardScreen} />
       <Stack.Screen name="SettingsScreen" component={SettingsScreen} />
       <Stack.Screen name="HelpScreen" component={HelpScreen} />
       <Stack.Screen name="UserListScreen" component={UserListScreen} />

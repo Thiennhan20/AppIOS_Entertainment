@@ -326,7 +326,6 @@ export const phimApi = {
 
       return results.length > 0 ? results : null;
     } catch (e) {
-      console.warn("Failed fetching from PhimAPI", e);
       return null;
     }
   }

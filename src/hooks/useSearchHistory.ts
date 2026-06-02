@@ -43,7 +43,6 @@ export function useSearchHistory(isAuthenticated: boolean) {
       await searchHistoryApi.syncHistory(data);
       dirtyRef.current = false;
     } catch (err) {
-      console.warn('Search history sync failed, will retry:', err);
     }
   }, []);
 
@@ -80,7 +79,6 @@ export function useSearchHistory(isAuthenticated: boolean) {
         setHistory(sortDesc(res.history || []));
       })
       .catch((err) => {
-        console.warn('Failed to load search history:', err);
       })
       .finally(() => setIsLoading(false));
   }, [isAuthenticated]);
@@ -148,7 +146,6 @@ export function useSearchHistory(isAuthenticated: boolean) {
     }
     dirtyRef.current = false;
     searchHistoryApi.clearHistory().catch((err) => {
-      console.warn('Failed to clear search history on server:', err);
     });
   }, []);
 

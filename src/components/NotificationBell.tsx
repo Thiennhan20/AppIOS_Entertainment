@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
+  Animated,
   AppState,
   Modal,
   Pressable,
@@ -14,7 +15,6 @@ import {
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Image } from 'expo-image';
 import { Ionicons } from '@expo/vector-icons';
-import { io, Socket } from 'socket.io-client';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '../context/AuthContext';
@@ -78,9 +78,54 @@ export default function NotificationBell({ navigation }: Props) {
   const versionUnreadCount = versionNotifications.filter((notification) => !notification.read).length;
   const unreadCount = serverUnreadCount + versionUnreadCount;
   const hasNotifications = notifications.length > 0 || versionNotifications.length > 0;
+
+  const pulseAnim = useRef(new Animated.Value(0.3)).current;
+
+  useEffect(() => {
+    let animation: Animated.CompositeAnimation | null = null;
+    if (visible && loading) {
+      pulseAnim.setValue(0.3);
+      animation = Animated.loop(
+        Animated.sequence([
+          Animated.timing(pulseAnim, {
+            toValue: 0.75,
+            duration: 850,
+            useNativeDriver: true,
+          }),
+          Animated.timing(pulseAnim, {
+            toValue: 0.3,
+            duration: 850,
+            useNativeDriver: true,
+          }),
+        ])
+      );
+      animation.start();
+    } else {
+      pulseAnim.setValue(0.3);
+    }
+    return () => {
+      if (animation) {
+        animation.stop();
+      }
+    };
+  }, [visible, loading, pulseAnim]);
+
   const sections = [
     ...(versionNotifications.length ? [{ title: t('notifications.updates'), data: versionNotifications }] : []),
-    ...(notifications.length ? [{ title: t('notifications.activity'), data: notifications }] : []),
+    ...(notifications.length
+      ? [{ title: t('notifications.activity'), data: notifications }]
+      : (loading && user
+          ? [{
+              title: t('notifications.activity'),
+              data: [
+                { _id: 'skeleton-1', type: 'skeleton' as any, read: true, createdAt: new Date().toISOString() },
+                { _id: 'skeleton-2', type: 'skeleton' as any, read: true, createdAt: new Date().toISOString() },
+                { _id: 'skeleton-3', type: 'skeleton' as any, read: true, createdAt: new Date().toISOString() },
+              ] as AppNotification[]
+            }]
+          : []
+        )
+    ),
   ];
 
   const rememberNotifications = (items: AppNotification[]) => {
@@ -118,12 +163,6 @@ export default function NotificationBell({ navigation }: Props) {
   }, []);
 
   const loadUnreadCount = useCallback(async () => {
-    try {
-      await loadLatestVersion();
-    } catch {
-      // Git update history is best-effort and should not block social notifications.
-    }
-
     if (!user) {
       setServerUnreadCount(0);
       return;
@@ -134,15 +173,19 @@ export default function NotificationBell({ navigation }: Props) {
     } catch {
       // The list can still be loaded when the user opens the panel.
     }
-  }, [loadLatestVersion, user]);
+  }, [user]);
 
   const loadNotifications = useCallback(async (refresh = false) => {
     refresh ? setRefreshing(true) : setLoading(true);
     setError(false);
     try {
-      await loadLatestVersion();
-      if (user) {
-        const response = await notificationApi.getNotifications();
+      // Parallelize social notifications and version checking to prevent blocking!
+      const [_, response] = await Promise.all([
+        loadLatestVersion().catch(() => {}),
+        user ? notificationApi.getNotifications() : Promise.resolve(null),
+      ]);
+
+      if (response) {
         rememberNotifications(response.data);
         setNotifications(response.data);
         setServerUnreadCount(response.unreadCount);
@@ -157,54 +200,33 @@ export default function NotificationBell({ navigation }: Props) {
 
   useEffect(() => {
     loadUnreadCount();
+    loadLatestVersion().catch(() => {});
+    
+    // Set up 60-second count & version poll, identical to web
+    let intervalId: NodeJS.Timeout | null = null;
+    if (user) {
+      intervalId = setInterval(() => {
+        loadUnreadCount();
+        loadLatestVersion().catch(() => {});
+      }, 60000);
+    }
+
     const subscription = AppState.addEventListener('change', (nextState) => {
-      if (nextState === 'active') loadUnreadCount();
+      if (nextState === 'active') {
+        loadUnreadCount();
+        loadLatestVersion().catch(() => {});
+      }
     });
 
-    return () => subscription.remove();
-  }, [loadUnreadCount]);
+    return () => {
+      subscription.remove();
+      if (intervalId) clearInterval(intervalId);
+    };
+  }, [loadUnreadCount, loadLatestVersion, user]);
 
   useEffect(() => {
     if (visible) loadNotifications();
   }, [loadNotifications, visible]);
-
-  useEffect(() => {
-    if (!user) {
-      setNotifications([]);
-      setServerUnreadCount(0);
-      notificationIds.current.clear();
-      return;
-    }
-
-    let cancelled = false;
-    let socket: Socket | null = null;
-
-    AsyncStorage.getItem('@auth_token').then((token) => {
-      if (!token || cancelled) return;
-
-      socket = io(getNotificationSocketUrl(), {
-        auth: { token },
-        transports: ['websocket', 'polling'],
-        reconnection: true,
-      });
-
-      socket.on('notification:new', (notification: AppNotification) => {
-        const isNew = !notificationIds.current.has(notification._id);
-        notificationIds.current.add(notification._id);
-        setNotifications((current) => mergeNotifications(current, [notification]));
-
-        if (isNew && !notification.read) {
-          setServerUnreadCount((current) => current + 1);
-        }
-      });
-    });
-
-    return () => {
-      cancelled = true;
-      socket?.removeAllListeners();
-      socket?.disconnect();
-    };
-  }, [user]);
 
   const markVersionAsRead = async (notification: AppNotification) => {
     const hash = notification.metadata?.versionHash;
@@ -348,7 +370,24 @@ export default function NotificationBell({ navigation }: Props) {
     }
   };
 
+  const renderSkeletonItem = (index: string | number) => (
+    <Animated.View key={`skeleton-${index}`} style={[styles.item, { opacity: pulseAnim }]}>
+      <View style={styles.avatarWrap}>
+        <View style={[styles.avatarFallback, { backgroundColor: '#2B303B' }]} />
+      </View>
+      <View style={styles.itemContent}>
+        <View style={[styles.itemHeader, { height: 13, backgroundColor: '#2B303B', borderRadius: 4, width: '45%', marginBottom: 7 }]} />
+        <View style={{ height: 11, backgroundColor: '#232832', borderRadius: 4, width: '85%', marginBottom: 7 }} />
+        <View style={{ height: 10, backgroundColor: '#1C202A', borderRadius: 3, width: '25%' }} />
+      </View>
+    </Animated.View>
+  );
+
   const renderNotification = ({ item }: { item: AppNotification }) => {
+    if (item.type === ('skeleton' as any)) {
+      return renderSkeletonItem(item._id);
+    }
+
     const icon = notificationIcon(item.type);
     const actorName = item.actor?.name || t('notifications.someone');
     const isVersion = item.type === 'version_updated';
@@ -415,31 +454,48 @@ export default function NotificationBell({ navigation }: Props) {
         <Pressable onPress={() => setVisible(false)} style={[styles.overlay, { paddingTop: insets.top + 60 }]}>
           <Pressable onPress={(event) => event.stopPropagation()} style={styles.panel}>
             <View style={styles.panelHeader}>
-              <View>
+              <View style={{ flex: 1, marginRight: 8 }}>
                 <Text style={styles.panelTitle}>{t('notifications.label')}</Text>
                 <Text style={styles.panelSubtitle}>
                   {t('notifications.unread_count', { count: unreadCount })}
                 </Text>
               </View>
-              <TouchableOpacity
-                disabled={!unreadCount || markingAll}
-                onPress={handleMarkAllRead}
-                style={styles.markAllButton}
-              >
-                {markingAll ? (
-                  <ActivityIndicator color={themeColor} size="small" />
-                ) : (
-                  <Text style={[styles.markAllText, { color: unreadCount ? themeColor : '#60646D' }]}>
-                    {t('notifications.mark_all_read')}
+              <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                <TouchableOpacity
+                  disabled={loading || refreshing}
+                  onPress={() => loadNotifications(true)}
+                  style={[styles.markAllButton, { marginRight: 8 }]}
+                >
+                  <Text style={[styles.markAllText, { color: themeColor }]}>
+                    {t('notifications.refresh')}
                   </Text>
-                )}
-              </TouchableOpacity>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  disabled={!unreadCount || markingAll}
+                  onPress={handleMarkAllRead}
+                  style={styles.markAllButton}
+                >
+                  {markingAll ? (
+                    <ActivityIndicator color={themeColor} size="small" />
+                  ) : (
+                    <Text style={[styles.markAllText, { color: unreadCount ? themeColor : '#60646D' }]}>
+                      {t('notifications.mark_all_read')}
+                    </Text>
+                  )}
+                </TouchableOpacity>
+              </View>
             </View>
 
             {loading && !hasNotifications ? (
-              <View style={styles.state}>
-                <ActivityIndicator color={themeColor} size="large" />
-                <Text style={styles.stateText}>{t('notifications.loading')}</Text>
+              <View style={{ flex: 1 }}>
+                {renderSkeletonItem(1)}
+                {renderSkeletonItem(2)}
+                {renderSkeletonItem(3)}
+                <View style={[styles.state, { minHeight: 90, paddingVertical: 10 }]}>
+                  <ActivityIndicator color={themeColor} size="small" />
+                  <Text style={[styles.stateText, { marginTop: 6, fontSize: 12 }]}>{t('notifications.loading')}</Text>
+                </View>
               </View>
             ) : error && !hasNotifications ? (
               <View style={styles.state}>
