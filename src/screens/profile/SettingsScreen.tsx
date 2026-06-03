@@ -27,6 +27,7 @@ export default function SettingsScreen({ navigation }: any) {
   const [saving, setSaving] = useState(false);
   const [avatarBase64, setAvatarBase64] = useState<string | null>(null);
   const [avatarMenuVisible, setAvatarMenuVisible] = useState(false);
+  const [loadingLibrary, setLoadingLibrary] = useState(false);
   const pendingAction = useRef<(() => void) | null>(null);
 
   const [alertConfig, setAlertConfig] = useState({
@@ -119,9 +120,11 @@ export default function SettingsScreen({ navigation }: any) {
   };
 
   const handleChangeAvatar = async () => {
+    setLoadingLibrary(true);
     try {
       const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
       if (status !== 'granted') {
+        setLoadingLibrary(false);
         showAlert(
           t('general.error') || 'Error', 
           t('profile.permission_needed') || 'Sorry, we need camera roll permissions to make this work!', 
@@ -148,6 +151,7 @@ export default function SettingsScreen({ navigation }: any) {
         }
 
         if (sizeInBytes && sizeInBytes > 10 * 1024 * 1024) {
+          setLoadingLibrary(false);
           showAlert(t('general.error') || 'Error', t('profile.file_too_large') || 'Image size must be less than 10MB', true);
           return;
         }
@@ -159,6 +163,8 @@ export default function SettingsScreen({ navigation }: any) {
     } catch (error: any) {
       console.log('Image picker error:', error?.message || error);
       showAlert(t('general.error') || 'Error', t('profile.error_choosing_image') || 'Error choosing image', true);
+    } finally {
+      setLoadingLibrary(false);
     }
   };
 
@@ -332,6 +338,15 @@ export default function SettingsScreen({ navigation }: any) {
         isError={alertConfig.isError}
         iconName={alertConfig.iconName}
       />
+
+      {loadingLibrary && (
+        <View style={styles.loadingOverlay}>
+          <ActivityIndicator size="large" color={themeColor} />
+          <Text style={styles.loadingText}>
+            {t('profile.opening_library') || 'Đang mở thư viện...'}
+          </Text>
+        </View>
+      )}
     </KeyboardAvoidingView>
   );
 }
@@ -498,5 +513,22 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 15,
     fontWeight: 'bold',
+  },
+  loadingOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(15, 15, 19, 0.75)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 9999,
+  },
+  loadingText: {
+    color: '#fff',
+    marginTop: 12,
+    fontSize: 14,
+    fontWeight: '500',
   }
 });

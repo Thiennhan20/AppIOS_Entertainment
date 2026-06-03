@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, forwardRef, useImperativeHandle } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Animated, AppState, AppStateStatus, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Animated, AppState, AppStateStatus, ActivityIndicator, Dimensions } from 'react-native';
 import { useVideoPlayer, VideoView } from 'expo-video';
 import { Ionicons } from '@expo/vector-icons';
 import Slider from '@react-native-community/slider';
@@ -62,10 +62,15 @@ const CustomVideoPlayer = forwardRef<CustomVideoPlayerRef, CustomVideoPlayerProp
     volume: 1,
   });
 
-  const [showSpeedMenu, setShowSpeedMenu] = useState(false);
   const [showZoomMenu, setShowZoomMenu] = useState(false);
   const ZOOM_LEVELS = [0.9, 0.95, 1.0, 1.1, 1.15];
   const [zoomIndex, setZoomIndex] = useState(2);
+
+  // Settings menu states
+  const [showSettingsMenu, setShowSettingsMenu] = useState(false);
+  const [settingsMenuView, setSettingsMenuView] = useState<'main' | 'speed' | 'quality' | 'audio'>('main');
+  const [selectedQuality, setSelectedQuality] = useState('Tự động');
+  const [selectedAudioPreset, setSelectedAudioPreset] = useState('Bật');
 
   const isSeekingRef = useRef(false);
   const seekTargetRef = useRef(0);
@@ -91,6 +96,22 @@ const CustomVideoPlayer = forwardRef<CustomVideoPlayerRef, CustomVideoPlayerProp
   const initialPinchDistRef = useRef<number | null>(null);
   const hasPinchedRef = useRef<boolean>(false);
   const hasSeekedRef = useRef<boolean>(false);
+
+  // Double-tap to toggle fullscreen
+  const lastTapTimeRef = useRef(0);
+  const doubleTapTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const [doubleTapSide, setDoubleTapSide] = useState<'center' | null>(null);
+
+  // Double-tap guard for control buttons (play/pause, skip)
+  const btnDoubleTapTimeRef = useRef(0);
+  const btnDoubleTapTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Long-press edges for 2x speed
+  const longPressTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const longPressActiveRef = useRef(false);
+  const savedPlaybackRateRef = useRef(1);
+  const [speedBoostActive, setSpeedBoostActive] = useState(false);
+  const speedBoostOpacity = useRef(new Animated.Value(0)).current;
 
   // Save progress refs
   const lastSavedTimeRef = useRef(0);
@@ -409,34 +430,63 @@ const CustomVideoPlayer = forwardRef<CustomVideoPlayerRef, CustomVideoPlayerProp
     }
   }));
 
-  const togglePlay = () => {
-    if (isWatchPartyViewOnly) return; 
-    if (playerState.isPlaying) {
-      player.pause();
-      if (onLocalPause) onLocalPause(player.currentTime || 0);
-    } else {
-      player.play();
-      if (onLocalPlay) onLocalPlay(player.currentTime || 0);
+  // Wraps any control button action with double-tap guard:
+  // first press waits 300ms; if a second press arrives, toggle fullscreen instead.
+  const withDoubleTapGuard = (action: () => void) => {
+    if (isWatchPartyViewOnly) return;
+    const now = Date.now();
+    const DELAY = 300;
+
+    if (now - btnDoubleTapTimeRef.current < DELAY) {
+      // Double-tap on a button → toggle fullscreen
+      if (btnDoubleTapTimeoutRef.current) {
+        clearTimeout(btnDoubleTapTimeoutRef.current);
+        btnDoubleTapTimeoutRef.current = null;
+      }
+      btnDoubleTapTimeRef.current = 0;
+      flashDoubleTap();
+      onToggleFullscreen();
+      return;
     }
-    resetControlsTimeout();
+
+    btnDoubleTapTimeRef.current = now;
+    btnDoubleTapTimeoutRef.current = setTimeout(() => {
+      action();
+      btnDoubleTapTimeoutRef.current = null;
+    }, DELAY);
+  };
+
+  const togglePlay = () => {
+    withDoubleTapGuard(() => {
+      if (playerState.isPlaying) {
+        player.pause();
+        if (onLocalPause) onLocalPause(player.currentTime || 0);
+      } else {
+        player.play();
+        if (onLocalPlay) onLocalPlay(player.currentTime || 0);
+      }
+      resetControlsTimeout();
+    });
   };
 
   const skipBackward = () => {
-    if (isWatchPartyViewOnly) return;
-    if (player) {
-      const baseTime = isSeekingRef.current ? seekTargetRef.current : (player.currentTime || 0);
-      const target = Math.max(baseTime - 10, 0);
-      handleSeek(target);
-    }
+    withDoubleTapGuard(() => {
+      if (player) {
+        const baseTime = isSeekingRef.current ? seekTargetRef.current : (player.currentTime || 0);
+        const target = Math.max(baseTime - 10, 0);
+        handleSeek(target);
+      }
+    });
   };
   
   const skipForward = () => {
-    if (isWatchPartyViewOnly) return;
-    if (player) {
-      const baseTime = isSeekingRef.current ? seekTargetRef.current : (player.currentTime || 0);
-      const target = Math.min(baseTime + 10, player.duration || 0);
-      handleSeek(target);
-    }
+    withDoubleTapGuard(() => {
+      if (player) {
+        const baseTime = isSeekingRef.current ? seekTargetRef.current : (player.currentTime || 0);
+        const target = Math.min(baseTime + 10, player.duration || 0);
+        handleSeek(target);
+      }
+    });
   };
 
   const handleSeek = (value: number) => {
@@ -481,16 +531,58 @@ const CustomVideoPlayer = forwardRef<CustomVideoPlayerRef, CustomVideoPlayerProp
     resetControlsTimeout();
   };
 
+  const toggleSettingsMenu = () => {
+    if (showSettingsMenu) {
+      setShowSettingsMenu(false);
+    } else {
+      setSettingsMenuView('main');
+      setShowSettingsMenu(true);
+    }
+    resetControlsTimeout();
+  };
+
   const showControlsTemporarily = () => {
     setShowControls(prev => {
       const next = !prev;
       if (next) resetControlsTimeout();
       else {
-         setShowSpeedMenu(false);
          setShowZoomMenu(false);
+         setShowSettingsMenu(false);
       }
       return next;
     });
+  };
+
+  // ─── Long-press edge speed boost helpers ─────────────────
+  const startSpeedBoost = () => {
+    if (longPressActiveRef.current) return;
+    longPressActiveRef.current = true;
+    savedPlaybackRateRef.current = player?.playbackRate || 1;
+    if (player) player.playbackRate = 2;
+    setSpeedBoostActive(true);
+    Animated.timing(speedBoostOpacity, { toValue: 1, duration: 200, useNativeDriver: true }).start();
+  };
+
+  const stopSpeedBoost = () => {
+    if (!longPressActiveRef.current) return;
+    longPressActiveRef.current = false;
+    if (player) player.playbackRate = savedPlaybackRateRef.current;
+    Animated.timing(speedBoostOpacity, { toValue: 0, duration: 200, useNativeDriver: true }).start(() => {
+      setSpeedBoostActive(false);
+    });
+  };
+
+  const cancelLongPressTimer = () => {
+    if (longPressTimerRef.current) {
+      clearTimeout(longPressTimerRef.current);
+      longPressTimerRef.current = null;
+    }
+  };
+
+  // ─── Double-tap fullscreen flash ─────────────────────────
+  const flashDoubleTap = () => {
+    setDoubleTapSide('center');
+    setTimeout(() => setDoubleTapSide(null), 400);
   };
 
   const getDistance = (touches: any) => {
@@ -504,8 +596,23 @@ const CustomVideoPlayer = forwardRef<CustomVideoPlayerRef, CustomVideoPlayerProp
     if (e.nativeEvent.touches.length === 2 && isFullscreen) {
       initialPinchDistRef.current = getDistance(e.nativeEvent.touches);
       hasPinchedRef.current = true;
+      cancelLongPressTimer();
     } else if (e.nativeEvent.touches.length === 1) {
       hasPinchedRef.current = false;
+
+      // Determine if touch is on left/right edge (35% each side)
+      const touchX = e.nativeEvent.locationX;
+      const viewWidth = e.nativeEvent.target ? Dimensions.get('window').width : 300;
+      const edgeThreshold = viewWidth * 0.35;
+      const isOnEdge = touchX < edgeThreshold || touchX > (viewWidth - edgeThreshold);
+
+      if (isOnEdge) {
+        // Start long-press timer for 2x speed (400ms hold)
+        cancelLongPressTimer();
+        longPressTimerRef.current = setTimeout(() => {
+          startSpeedBoost();
+        }, 400);
+      }
     }
   };
 
@@ -522,12 +629,49 @@ const CustomVideoPlayer = forwardRef<CustomVideoPlayerRef, CustomVideoPlayerProp
          initialPinchDistRef.current = currentDist;
       }
     }
+    // If finger moves, cancel long-press (user is swiping, not holding)
+    if (!longPressActiveRef.current) {
+      cancelLongPressTimer();
+    }
   };
 
   const handleTouchEnd = (e: any) => {
+    // Stop speed boost on finger lift
+    cancelLongPressTimer();
+    if (longPressActiveRef.current) {
+      stopSpeedBoost();
+      // Don't toggle controls when releasing speed boost
+      if (e.nativeEvent.touches.length === 0) {
+        initialPinchDistRef.current = null;
+        hasPinchedRef.current = false;
+      }
+      return;
+    }
+
     if (e.nativeEvent.touches.length === 0) {
       if (!hasPinchedRef.current) {
-        showControlsTemporarily();
+        // ── Double-tap detection ──
+        const now = Date.now();
+        const DOUBLE_TAP_DELAY = 300;
+
+        if (now - lastTapTimeRef.current < DOUBLE_TAP_DELAY) {
+          // Double-tap detected → toggle fullscreen
+          if (doubleTapTimeoutRef.current) {
+            clearTimeout(doubleTapTimeoutRef.current);
+            doubleTapTimeoutRef.current = null;
+          }
+          lastTapTimeRef.current = 0;
+          flashDoubleTap();
+          onToggleFullscreen();
+        } else {
+          // First tap — wait to see if a second tap follows
+          lastTapTimeRef.current = now;
+          doubleTapTimeoutRef.current = setTimeout(() => {
+            // No second tap → normal single tap (toggle controls)
+            showControlsTemporarily();
+            doubleTapTimeoutRef.current = null;
+          }, DOUBLE_TAP_DELAY);
+        }
       }
       initialPinchDistRef.current = null;
       hasPinchedRef.current = false;
@@ -538,6 +682,8 @@ const CustomVideoPlayer = forwardRef<CustomVideoPlayerRef, CustomVideoPlayerProp
     if (controlsTimeoutRef.current) clearTimeout(controlsTimeoutRef.current);
     controlsTimeoutRef.current = setTimeout(() => {
       setShowControls(false);
+      setShowZoomMenu(false);
+      setShowSettingsMenu(false);
     }, 3500);
   };
 
@@ -583,6 +729,25 @@ const CustomVideoPlayer = forwardRef<CustomVideoPlayerRef, CustomVideoPlayerProp
                   : t('watch_party.syncing', { defaultValue: 'Syncing with host...' })}
                </Text>
             </View>
+          )}
+
+          {/* Double-tap fullscreen indicator */}
+          {doubleTapSide === 'center' && (
+            <View style={styles.doubleTapOverlay} pointerEvents="none">
+              <View style={styles.doubleTapBubble}>
+                <Ionicons name={isFullscreen ? 'contract-outline' : 'expand-outline'} size={30} color="white" />
+              </View>
+            </View>
+          )}
+
+          {/* Speed boost overlay (long-press edges) */}
+          {speedBoostActive && (
+            <Animated.View style={[styles.speedBoostOverlay, { opacity: speedBoostOpacity }]} pointerEvents="none">
+              <View style={styles.speedBoostBubble}>
+                <Ionicons name="play-forward" size={18} color="white" />
+                <Text style={styles.speedBoostText}>2x</Text>
+              </View>
+            </Animated.View>
           )}
       </View>
 
@@ -689,23 +854,192 @@ const CustomVideoPlayer = forwardRef<CustomVideoPlayerRef, CustomVideoPlayerProp
               )}
             </View>
             <View style={{flex: 1}} />
-            <View style={styles.topRightControls}>
-                {showSpeedMenu && (
-                  <View style={styles.popupMenu}>
-                    {[0.5, 1, 1.25, 1.5, 2].map(r => (
-                      <TouchableOpacity key={r} style={styles.popupMenuItem} onPress={() => {
-                        if (player) player.playbackRate = r;
-                        setShowSpeedMenu(false);
-                        resetControlsTimeout();
-                      }}>
-                        <Text style={[styles.popupMenuText, playerState.playbackRate === r && { color: themeColor, fontWeight: 'bold' }]}>{r}x</Text>
-                      </TouchableOpacity>
-                    ))}
+             <View style={styles.topRightControls}>
+                {showSettingsMenu && (
+                  <View style={styles.settingsMenu}>
+                    {settingsMenuView === 'main' && (
+                      <View>
+                        {/* Playback Speed Option */}
+                        <TouchableOpacity
+                          style={styles.settingsMenuItem}
+                          onPress={() => { setSettingsMenuView('speed'); resetControlsTimeout(); }}
+                        >
+                          <View style={styles.settingsItemLeft}>
+                            <Ionicons name="speedometer-outline" size={20} color="white" style={{ marginRight: 10 }} />
+                            <Text style={styles.settingsItemLabel}>
+                              {t('player.playback_speed', { defaultValue: 'Tốc độ phát' })}
+                            </Text>
+                          </View>
+                          <View style={styles.settingsItemRight}>
+                            <Text style={styles.settingsItemValue}>
+                              {playerState.playbackRate === 1 ? t('player.normal', { defaultValue: 'Chuẩn' }) : `${playerState.playbackRate}x`}
+                            </Text>
+                            <Ionicons name="chevron-forward" size={16} color="#aaa" />
+                          </View>
+                        </TouchableOpacity>
+
+                        {/* Quality Option */}
+                        <TouchableOpacity
+                          style={styles.settingsMenuItem}
+                          onPress={() => { setSettingsMenuView('quality'); resetControlsTimeout(); }}
+                        >
+                          <View style={styles.settingsItemLeft}>
+                            <Ionicons name="options-outline" size={20} color="white" style={{ marginRight: 10 }} />
+                            <Text style={styles.settingsItemLabel}>
+                              {t('player.quality', { defaultValue: 'Chất lượng' })}
+                            </Text>
+                          </View>
+                          <View style={styles.settingsItemRight}>
+                            <Text style={styles.settingsItemValue}>
+                              {selectedQuality === 'Tự động' ? t('player.auto', { defaultValue: 'Tự động' }) : selectedQuality}
+                            </Text>
+                            <Ionicons name="chevron-forward" size={16} color="#aaa" />
+                          </View>
+                        </TouchableOpacity>
+
+                        {/* Audio Enhancement Option */}
+                        <TouchableOpacity
+                          style={styles.settingsMenuItem}
+                          onPress={() => { setSettingsMenuView('audio'); resetControlsTimeout(); }}
+                        >
+                          <View style={styles.settingsItemLeft}>
+                            <Ionicons name="headset-outline" size={20} color="white" style={{ marginRight: 10 }} />
+                            <Text style={styles.settingsItemLabel}>
+                              {t('player.audio_enhancement', { defaultValue: 'Cải thiện âm thanh' })}
+                            </Text>
+                          </View>
+                          <View style={styles.settingsItemRight}>
+                            <Text style={[
+                              styles.settingsItemValue,
+                              selectedAudioPreset === 'Bật' ? { color: '#ff9800', fontWeight: 'bold' } : { color: '#aaa' }
+                            ]}>
+                              {selectedAudioPreset === 'Bật' ? t('player.on', { defaultValue: 'Bật' }) : t('player.off', { defaultValue: 'Tắt' })}
+                            </Text>
+                            <Ionicons name="chevron-forward" size={16} color="#aaa" />
+                          </View>
+                        </TouchableOpacity>
+                      </View>
+                    )}
+
+                    {settingsMenuView === 'speed' && (
+                      <View>
+                        <View style={styles.settingsSubHeader}>
+                          <TouchableOpacity
+                            style={styles.settingsSubBackBtn}
+                            onPress={() => { setSettingsMenuView('main'); resetControlsTimeout(); }}
+                          >
+                            <Ionicons name="chevron-back" size={20} color="white" />
+                          </TouchableOpacity>
+                          <Text style={styles.settingsSubTitle}>
+                            {t('player.playback_speed', { defaultValue: 'Tốc độ phát' })}
+                          </Text>
+                        </View>
+                        {[0.5, 0.75, 1, 1.25, 1.5, 2].map((r) => (
+                          <TouchableOpacity
+                            key={r}
+                            style={styles.settingsSubOptionItem}
+                            onPress={() => {
+                              if (player) player.playbackRate = r;
+                              setShowSettingsMenu(false);
+                              resetControlsTimeout();
+                            }}
+                          >
+                            <Text style={[
+                              styles.settingsSubOptionText,
+                              playerState.playbackRate === r && { color: themeColor, fontWeight: 'bold' }
+                            ]}>
+                              {r === 1 ? `${t('player.normal', { defaultValue: 'Chuẩn' })} (1x)` : `${r}x`}
+                            </Text>
+                            {playerState.playbackRate === r && (
+                              <Ionicons name="checkmark" size={18} color={themeColor} />
+                            )}
+                          </TouchableOpacity>
+                        ))}
+                      </View>
+                    )}
+
+                    {settingsMenuView === 'quality' && (
+                      <View>
+                        <View style={styles.settingsSubHeader}>
+                          <TouchableOpacity
+                            style={styles.settingsSubBackBtn}
+                            onPress={() => { setSettingsMenuView('main'); resetControlsTimeout(); }}
+                          >
+                            <Ionicons name="chevron-back" size={20} color="white" />
+                          </TouchableOpacity>
+                          <Text style={styles.settingsSubTitle}>
+                            {t('player.quality', { defaultValue: 'Chất lượng' })}
+                          </Text>
+                        </View>
+                        {['Tự động'].map((q) => (
+                          <TouchableOpacity
+                            key={q}
+                            style={styles.settingsSubOptionItem}
+                            onPress={() => {
+                              setSelectedQuality(q);
+                              setShowSettingsMenu(false);
+                              resetControlsTimeout();
+                            }}
+                          >
+                            <Text style={[
+                              styles.settingsSubOptionText,
+                              selectedQuality === q && { color: themeColor, fontWeight: 'bold' }
+                            ]}>
+                              {t('player.auto', { defaultValue: 'Tự động' })}
+                            </Text>
+                            {selectedQuality === q && (
+                              <Ionicons name="checkmark" size={18} color={themeColor} />
+                            )}
+                          </TouchableOpacity>
+                        ))}
+                      </View>
+                    )}
+
+                    {settingsMenuView === 'audio' && (
+                      <View>
+                        <View style={styles.settingsSubHeader}>
+                          <TouchableOpacity
+                            style={styles.settingsSubBackBtn}
+                            onPress={() => { setSettingsMenuView('main'); resetControlsTimeout(); }}
+                          >
+                            <Ionicons name="chevron-back" size={20} color="white" />
+                          </TouchableOpacity>
+                          <Text style={styles.settingsSubTitle}>
+                            {t('player.audio_enhancement', { defaultValue: 'Cải thiện âm thanh' })}
+                          </Text>
+                        </View>
+                        {['Bật', 'Tắt'].map((preset) => {
+                          const isPresetActive = selectedAudioPreset === preset;
+                          const displayLabel = preset === 'Bật' ? t('player.on', { defaultValue: 'Bật' }) : t('player.off', { defaultValue: 'Tắt' });
+                          return (
+                            <TouchableOpacity
+                              key={preset}
+                              style={styles.settingsSubOptionItem}
+                              onPress={() => {
+                                setSelectedAudioPreset(preset);
+                                setShowSettingsMenu(false);
+                                resetControlsTimeout();
+                              }}
+                            >
+                              <Text style={[
+                                styles.settingsSubOptionText,
+                                isPresetActive && (preset === 'Bật' ? { color: '#ff9800', fontWeight: 'bold' } : { color: themeColor, fontWeight: 'bold' })
+                              ]}>
+                                {displayLabel}
+                              </Text>
+                              {isPresetActive && (
+                                <Ionicons name="checkmark" size={18} color={preset === 'Bật' ? '#ff9800' : themeColor} />
+                              )}
+                            </TouchableOpacity>
+                          );
+                        })}
+                      </View>
+                    )}
                   </View>
                 )}
 
-                <TouchableOpacity style={styles.topBtn} onPress={() => { setShowSpeedMenu(!showSpeedMenu); resetControlsTimeout(); }}>
-                    <Text style={styles.speedText}>{playerState.playbackRate}x</Text>
+                <TouchableOpacity style={styles.topBtn} onPress={toggleSettingsMenu}>
+                    <Ionicons name="settings-outline" size={26} color="white" />
                 </TouchableOpacity>
                 <TouchableOpacity style={styles.topBtn} onPress={toggleMute}>
                     <Ionicons name={playerState.isMuted || playerState.volume === 0 ? "volume-mute-outline" : "volume-medium-outline"} size={26} color="white" />
@@ -842,6 +1176,79 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: 'bold',
   },
+  settingsMenu: {
+    position: 'absolute',
+    top: 50,
+    right: 15,
+    backgroundColor: 'rgba(15, 15, 15, 0.95)',
+    borderRadius: 12,
+    padding: 10,
+    width: 260,
+    zIndex: 100,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.15)',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 5,
+    elevation: 8,
+  },
+  settingsMenuItem: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 8,
+    borderRadius: 8,
+  },
+  settingsItemLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  settingsItemLabel: {
+    color: '#eee',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  settingsItemRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  settingsItemValue: {
+    color: '#aaa',
+    fontSize: 13,
+    marginRight: 6,
+  },
+  settingsSubHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(255,255,255,0.1)',
+    paddingBottom: 10,
+    marginBottom: 6,
+  },
+  settingsSubBackBtn: {
+    padding: 4,
+    marginRight: 8,
+  },
+  settingsSubTitle: {
+    color: 'white',
+    fontSize: 14,
+    fontWeight: 'bold',
+    flex: 1,
+  },
+  settingsSubOptionItem: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 10,
+    borderRadius: 8,
+  },
+  settingsSubOptionText: {
+    color: '#ddd',
+    fontSize: 14,
+  },
   centerControls: {
     ...StyleSheet.absoluteFillObject,
     flexDirection: 'row',
@@ -928,5 +1335,41 @@ const styles = StyleSheet.create({
     color: 'white',
     fontWeight: 'bold',
     fontSize: 14,
+  },
+  // Double-tap fullscreen indicator
+  doubleTapOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 45,
+  },
+  doubleTapBubble: {
+    backgroundColor: 'rgba(0,0,0,0.55)',
+    borderRadius: 40,
+    width: 64,
+    height: 64,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  // Speed boost overlay
+  speedBoostOverlay: {
+    position: 'absolute',
+    top: 12,
+    alignSelf: 'center',
+    zIndex: 45,
+  },
+  speedBoostBubble: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0,0,0,0.65)',
+    paddingHorizontal: 14,
+    paddingVertical: 7,
+    borderRadius: 20,
+    gap: 5,
+  },
+  speedBoostText: {
+    color: 'white',
+    fontSize: 15,
+    fontWeight: 'bold',
   },
 });

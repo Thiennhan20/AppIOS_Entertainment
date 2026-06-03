@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, TextInput, TouchableOpacity, ActivityIndicator, Alert } from 'react-native';
+import { View, Text, StyleSheet, TextInput, TouchableOpacity, ActivityIndicator, Alert, Pressable } from 'react-native';
 import { Image } from 'expo-image';
 import { Ionicons } from '@expo/vector-icons';
+import { useTranslation } from 'react-i18next';
 import { commentsApi } from '../api/commentsApi';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
@@ -22,6 +23,14 @@ interface Comment {
   likes: number;
   isLiked: boolean;
   replies?: Comment[];
+  isReply?: boolean;
+  parentId?: string;
+  replyTo?: {
+    _id: string;
+    name: string;
+    avatar?: string;
+  } | string;
+  replyToComment?: string | { _id: string };
 }
 
 interface CommentsProps {
@@ -34,6 +43,7 @@ interface CommentsProps {
 const COMMENTS_PER_PAGE = 3;
 
 export default function Comments({ movieId, type, title, onUserPress }: CommentsProps) {
+  const { t } = useTranslation();
   const { user } = useAuth();
   const { showToast } = useToast();
   const isAuthenticated = !!user;
@@ -154,9 +164,17 @@ export default function Comments({ movieId, type, title, onUserPress }: Comments
       if (res.success) {
         const updated = res.data;
         setComments(prev =>
-          prev.map(c =>
-            c._id === editingId ? { ...c, content: updated.content, updatedAt: updated.updatedAt } : c
-          )
+          prev.map(c => {
+            if (c._id === editingId) {
+              return { ...c, content: updated.content, updatedAt: updated.updatedAt };
+            }
+            return {
+              ...c,
+              replies: c.replies?.map(r =>
+                r._id === editingId ? { ...r, content: updated.content, updatedAt: updated.updatedAt } : r
+              )
+            };
+          })
         );
         setEditingId(null);
         setEditText('');
@@ -171,25 +189,53 @@ export default function Comments({ movieId, type, title, onUserPress }: Comments
   };
 
   const handleDelete = (id: string) => {
-    Alert.alert('Delete Comment', 'Are you sure you want to delete this comment?', [
-      { text: 'Cancel', style: 'cancel' },
-      {
-        text: 'Delete',
-        style: 'destructive',
-        onPress: async () => {
-          try {
-            const res = await commentsApi.deleteComment(id);
-            if (res.success) {
-              setComments(prev => prev.filter(c => c._id !== id));
-              setTotalComments(prev => Math.max(0, prev - 1));
-              showToast('Deleted item successfully', 'success');
+    const isTopLevelComment = comments.some(c => c._id === id);
+
+    Alert.alert(
+      t('player.delete_title', { defaultValue: 'Delete Comment' }),
+      t('player.delete_desc', { defaultValue: 'Are you sure you want to delete this comment?' }),
+      [
+        { text: t('player.cancel', { defaultValue: 'Cancel' }), style: 'cancel' },
+        {
+          text: t('player.delete', { defaultValue: 'Delete' }),
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              const res = await commentsApi.deleteComment(id);
+              if (res.success) {
+                const deletedIds = new Set<string>((res.deletedCommentIds || [id]).map((d: any) => String(d)));
+
+                setComments(prev =>
+                  prev
+                    .filter(c => !deletedIds.has(c._id))
+                    .map(c => ({
+                      ...c,
+                      replies: c.replies?.filter(r => !deletedIds.has(r._id))
+                    }))
+                );
+
+                if (isTopLevelComment) {
+                  setTotalComments(prev => Math.max(0, prev - 1));
+                }
+                showToast(t('player.deleted_success', { defaultValue: 'Deleted successfully' }), 'success');
+              }
+            } catch (e) {
+              showToast(t('player.failed_delete', { defaultValue: 'Failed to delete comment' }), 'error');
+            } finally {
+              setActionOpenId(null);
+              if (editingId && id === editingId) {
+                setEditingId(null);
+                setEditText('');
+              }
+              if (replyingTo && id === replyingTo) {
+                setReplyingTo(null);
+                setReplyText('');
+              }
             }
-          } catch (e) {
-            showToast('Failed to delete comment', 'error');
           }
         }
-      }
-    ]);
+      ]
+    );
   };
 
   const handleLike = async (commentId: string, isReply: boolean = false, parentId?: string) => {
@@ -240,6 +286,12 @@ export default function Comments({ movieId, type, title, onUserPress }: Comments
 
   return (
     <View style={styles.container}>
+      {actionOpenId !== null && (
+        <Pressable
+          style={styles.overlayBackdrop}
+          onPress={() => setActionOpenId(null)}
+        />
+      )}
       <View style={styles.header}>
         <Ionicons name="chatbubbles-outline" size={24} color="#ef4444" />
         <Text style={styles.headerTitle}>Comments</Text>
@@ -311,8 +363,12 @@ export default function Comments({ movieId, type, title, onUserPress }: Comments
           <ActivityIndicator size="large" color="#ef4444" />
         </View>
       ) : (
-        comments.map((comment) => (
-          <View key={comment._id} style={styles.commentItem}>
+        comments.map((comment) => {
+          const isParentOfOpenMenu = comment.replies?.some(r => r._id === actionOpenId);
+          const isMenuOpenOnThisComment = actionOpenId === comment._id || isParentOfOpenMenu;
+
+          return (
+            <View key={comment._id} style={[styles.commentItem, isMenuOpenOnThisComment && { zIndex: 6 }]}>
             <View style={styles.commentHeader}>
               <TouchableOpacity
                 activeOpacity={onUserPress ? 0.72 : 1}
@@ -415,37 +471,121 @@ export default function Comments({ movieId, type, title, onUserPress }: Comments
             )}
 
             {/* Replies items */}
-            {showReplies.has(comment._id) && comment.replies && comment.replies.map(reply => (
-              <View key={reply._id} style={styles.replyItem}>
-                <TouchableOpacity
-                  activeOpacity={onUserPress ? 0.72 : 1}
-                  disabled={!onUserPress || !reply.userId?._id}
-                  onPress={() => reply.userId?._id && onUserPress?.(reply.userId._id)}
-                  style={styles.commentUserRow}
-                >
-                  {reply.userId?.avatar ? (
-                    <Image source={{ uri: reply.userId.avatar }} style={styles.avatarTiny} contentFit="cover" />
-                  ) : (
-                    <View style={styles.avatarPlaceholderTiny}>
-                      <Text style={styles.avatarInitialTiny}>{reply.userId?.name?.charAt(0).toUpperCase() || '?'}</Text>
+            {showReplies.has(comment._id) && comment.replies && comment.replies.map(reply => {
+              const replyToCommentId = typeof reply.replyToComment === 'string' ? reply.replyToComment : reply.replyToComment?._id;
+              const isBranchReply = Boolean(replyToCommentId && replyToCommentId !== comment._id);
+              const replyToName = typeof reply.replyTo === 'object' && reply.replyTo ? reply.replyTo.name : '';
+
+              return (
+                <View key={reply._id} style={[styles.replyItem, isBranchReply && styles.branchReplyItem]}>
+                  <View style={styles.commentHeader}>
+                    <TouchableOpacity
+                      activeOpacity={onUserPress ? 0.72 : 1}
+                      disabled={!onUserPress || !reply.userId?._id}
+                      onPress={() => reply.userId?._id && onUserPress?.(reply.userId._id)}
+                      style={styles.commentUserRow}
+                    >
+                      {reply.userId?.avatar ? (
+                        <Image source={{ uri: reply.userId.avatar }} style={styles.avatarTiny} contentFit="cover" />
+                      ) : (
+                        <View style={styles.avatarPlaceholderTiny}>
+                          <Text style={styles.avatarInitialTiny}>{reply.userId?.name?.charAt(0).toUpperCase() || '?'}</Text>
+                        </View>
+                      )}
+                      <View style={styles.commentMeta}>
+                        <Text style={styles.commentNameSmall}>{reply.userId?.name || 'Unknown User'}</Text>
+                        <Text style={styles.commentTimeSmall}>{formatTime(reply.createdAt)}</Text>
+                      </View>
+                    </TouchableOpacity>
+
+                    {isAuthenticated && user?.id === reply.userId?._id && (
+                      <TouchableOpacity onPress={() => setActionOpenId(actionOpenId === reply._id ? null : reply._id)}>
+                        <Ionicons name="ellipsis-horizontal" size={16} color="#9ca3af" style={{ padding: 4 }} />
+                      </TouchableOpacity>
+                    )}
+                  </View>
+
+                  {/* Actions Menu */}
+                  {actionOpenId === reply._id && (
+                    <View style={[styles.actionMenu, { top: 25, right: 10 }]}>
+                      <TouchableOpacity style={styles.actionMenuItem} onPress={() => { setEditingId(reply._id); setEditText(reply.content); setActionOpenId(null); }}>
+                        <Text style={styles.actionMenuText}>Edit</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity style={styles.actionMenuItem} onPress={() => handleDelete(reply._id)}>
+                        <Text style={styles.actionMenuTextDelete}>Delete</Text>
+                      </TouchableOpacity>
                     </View>
                   )}
-                  <View style={styles.commentMeta}>
-                    <Text style={styles.commentNameSmall}>{reply.userId?.name || 'Unknown User'}</Text>
-                    <Text style={styles.commentTimeSmall}>{formatTime(reply.createdAt)}</Text>
+
+                  {replyToName ? (
+                    <Text style={[
+                      styles.replyToText,
+                      isBranchReply ? { color: '#7dd3fc' } : { color: '#6b7280' }
+                    ]}>
+                      {t('player.replying_to_user', { user: replyToName, defaultValue: `Phản hồi cho ${replyToName}` })}
+                    </Text>
+                  ) : null}
+
+                  {/* Content */}
+                  {editingId === reply._id ? (
+                    <View style={styles.editCard}>
+                      <TextInput
+                        style={[styles.textInput, { fontSize: 13, minHeight: 60 }]}
+                        value={editText}
+                        onChangeText={setEditText}
+                        multiline
+                      />
+                      <View style={styles.editActions}>
+                        <TouchableOpacity onPress={() => { setEditingId(null); setEditText(''); setActionOpenId(null); }} style={styles.editBtnCancel}>
+                          <Text style={styles.cancelText}>Cancel</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity onPress={submitEdit} style={styles.editBtnSave}>
+                          <Text style={styles.saveText}>Save</Text>
+                        </TouchableOpacity>
+                      </View>
+                    </View>
+                  ) : (
+                    <Text style={styles.replyContent}>{reply.content}</Text>
+                  )}
+
+                  <View style={styles.commentActions}>
+                    <TouchableOpacity style={styles.actionBtn} onPress={() => handleLike(reply._id, true, comment._id)}>
+                      <Ionicons name={reply.isLiked ? "heart" : "heart-outline"} size={14} color={reply.isLiked ? "#ef4444" : "#9ca3af"} />
+                      <Text style={styles.actionBtnText}>{reply.likes}</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity style={styles.actionBtn} onPress={() => { setReplyingTo(replyingTo === reply._id ? null : reply._id); setReplyText(''); setEditingId(null); }}>
+                      <Ionicons name="chatbubble-outline" size={14} color="#9ca3af" />
+                      <Text style={styles.actionBtnText}>Reply</Text>
+                    </TouchableOpacity>
                   </View>
-                </TouchableOpacity>
-                <Text style={styles.replyContent}>{reply.content}</Text>
-                <View style={styles.commentActions}>
-                  <TouchableOpacity style={styles.actionBtn} onPress={() => handleLike(reply._id, true, comment._id)}>
-                    <Ionicons name={reply.isLiked ? "heart" : "heart-outline"} size={14} color={reply.isLiked ? "#ef4444" : "#9ca3af"} />
-                    <Text style={styles.actionBtnText}>{reply.likes}</Text>
-                  </TouchableOpacity>
+
+                  {/* Reply Input */}
+                  {replyingTo === reply._id && (
+                    <View style={[styles.replyBox, { marginLeft: 0, marginTop: 10 }]}>
+                      <TextInput
+                        style={[styles.textInput, { fontSize: 13, height: 60 }]}
+                        value={replyText}
+                        onChangeText={setReplyText}
+                        placeholder={t('player.reply_to', { user: reply.userId?.name || 'User', defaultValue: `Reply to ${reply.userId?.name || 'User'}...` })}
+                        placeholderTextColor="#9ca3af"
+                        multiline
+                      />
+                      <View style={styles.editActions}>
+                        <TouchableOpacity onPress={() => setReplyingTo(null)} style={styles.editBtnCancel}>
+                          <Text style={styles.cancelText}>Cancel</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity onPress={() => submitReply(reply._id)} style={styles.editBtnSave}>
+                          <Text style={styles.saveText}>Reply</Text>
+                        </TouchableOpacity>
+                      </View>
+                    </View>
+                  )}
                 </View>
-              </View>
-            ))}
+              );
+            })}
           </View>
-        ))
+        );
+      })
       )}
 
       {hasMore && !isLoading && (
@@ -460,6 +600,12 @@ export default function Comments({ movieId, type, title, onUserPress }: Comments
 const styles = StyleSheet.create({
   container: {
     paddingVertical: 20,
+    position: 'relative',
+  },
+  overlayBackdrop: {
+    ...StyleSheet.absoluteFillObject,
+    zIndex: 5,
+    backgroundColor: 'transparent',
   },
   header: {
     flexDirection: 'row',
@@ -706,6 +852,17 @@ const styles = StyleSheet.create({
     borderLeftWidth: 2,
     borderLeftColor: '#374151',
     paddingLeft: 10,
+  },
+  branchReplyItem: {
+    marginLeft: 58,
+    borderLeftColor: 'rgba(14, 165, 233, 0.7)',
+    backgroundColor: 'rgba(14, 165, 233, 0.03)',
+  },
+  replyToText: {
+    fontSize: 11,
+    marginTop: 4,
+    marginBottom: 2,
+    fontWeight: '500',
   },
   avatarTiny: {
     width: 24,

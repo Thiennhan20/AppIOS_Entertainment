@@ -64,20 +64,34 @@ export default function UserCommentsScreen({ navigation }: any) {
   };
 
   const handleDelete = (commentId: string) => {
+    const isLikedFilter = activeFilter === 'liked';
+    const title = t('general.notice', { defaultValue: 'Notice' });
+    const message = isLikedFilter 
+      ? t('general.unlike_comment_confirm')
+      : t('general.delete_comment_confirm');
+
     Alert.alert(
-      t('general.notice', { defaultValue: 'Notice' }),
-      t('general.delete_comment_confirm'),
+      title,
+      message,
       [
         { text: t('general.cancel', { defaultValue: 'Cancel' }), style: 'cancel' },
         { 
-          text: t('general.delete'),
+          text: isLikedFilter ? t('general.unlike', { defaultValue: 'Unlike' }) : t('general.delete'),
           style: 'destructive',
           onPress: async () => {
             try {
-              await commentsApi.deleteComment(commentId);
+              if (isLikedFilter) {
+                // Since liked comments belong to others, we "unlike" it by toggling the like status
+                await commentsApi.likeComment(commentId);
+              } else {
+                await commentsApi.deleteComment(commentId);
+              }
               setData(prev => prev.filter(c => c._id !== commentId));
             } catch (error) {
-              Alert.alert(t('general.error'), t('general.delete_comment_failed'));
+              const errorMsg = isLikedFilter
+                ? t('general.unlike_comment_failed')
+                : t('general.delete_comment_failed');
+              Alert.alert(t('general.error'), errorMsg);
             }
           }
         }

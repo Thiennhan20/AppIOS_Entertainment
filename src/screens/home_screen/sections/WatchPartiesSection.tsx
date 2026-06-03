@@ -11,6 +11,25 @@ type Props = {
   navigation: any;
 };
 
+const getAvatarBg = (id: string) => {
+  const colors = [
+    '#ec4899', // rose-500
+    '#8b5cf6', // violet-500
+    '#3b82f6', // blue-500
+    '#10b981', // emerald-500
+    '#f59e0b', // amber-500
+    '#ef4444', // red-500
+    '#6366f1', // indigo-500
+    '#d946ef', // fuchsia-500
+  ];
+  if (!id) return colors[0];
+  let hash = 0;
+  for (let i = 0; i < id.length; i++) {
+    hash = id.charCodeAt(i) + ((hash << 5) - hash);
+  }
+  return colors[Math.abs(hash) % colors.length];
+};
+
 export default function WatchPartiesSection({ section, navigation }: Props) {
   const { themeColor } = useTheme();
   const { t } = useTranslation();
@@ -29,7 +48,7 @@ export default function WatchPartiesSection({ section, navigation }: Props) {
         windowSize={3}
         removeClippedSubviews={true}
         renderItem={({ item }) => {
-          const memberCount = item.member_count || item.members?.length || 1;
+          const memberCount = typeof item.member_count === 'number' ? item.member_count : (item.members?.length || 0);
           const maxUsers = item.max_users || 6;
           const isFull = memberCount >= maxUsers;
           const statusLabel = isFull ? t('streaming.full') : (item.status === 'playing' ? t('streaming.playing') : t('streaming.waiting'));
@@ -51,8 +70,10 @@ export default function WatchPartiesSection({ section, navigation }: Props) {
                 {item.host_avatar ? (
                   <Image source={{ uri: item.host_avatar }} style={{ width: 42, height: 42, borderRadius: 21, marginRight: 10 }} contentFit="cover" cachePolicy="memory-disk" />
                 ) : (
-                  <View style={{ width: 42, height: 42, borderRadius: 21, marginRight: 10, backgroundColor: 'rgba(255,255,255,0.1)', alignItems: 'center', justifyContent: 'center' }}>
-                    <Ionicons name="person" size={20} color="#fff" />
+                  <View style={{ width: 42, height: 42, borderRadius: 21, marginRight: 10, backgroundColor: getAvatarBg(item.host_id), alignItems: 'center', justifyContent: 'center' }}>
+                    <Text style={{ color: '#fff', fontSize: 16, fontWeight: 'bold' }}>
+                      {item.host_name?.charAt(0)?.toUpperCase() || '?'}
+                    </Text>
                   </View>
                 )}
                 <View style={{ flex: 1 }}>
@@ -73,10 +94,6 @@ export default function WatchPartiesSection({ section, navigation }: Props) {
                 <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                   <Ionicons name="people" size={16} color="#aaa" />
                   <Text style={{ color: '#aaa', fontSize: 12, marginLeft: 5 }}>{memberCount}/{maxUsers}</Text>
-                </View>
-                <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: themeColor, paddingHorizontal: 12, paddingVertical: 6, borderRadius: 8 }}>
-                  <Ionicons name="enter-outline" size={15} color="#fff" />
-                  <Text style={{ color: '#fff', fontSize: 12, marginLeft: 5, fontWeight: '800' }}>{t('streaming.join')}</Text>
                 </View>
               </View>
             </TouchableOpacity>

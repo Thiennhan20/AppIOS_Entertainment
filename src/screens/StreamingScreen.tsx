@@ -1,5 +1,5 @@
 import React, { useRef, useEffect, useState } from 'react';
-import { StyleSheet, Text, View, Animated, TouchableOpacity, Easing, Dimensions, TextInput, KeyboardAvoidingView, Platform, Alert, FlatList } from 'react-native';
+import { StyleSheet, Text, View, Animated, TouchableOpacity, Easing, Dimensions, TextInput, KeyboardAvoidingView, Platform, Alert, FlatList, ActivityIndicator } from 'react-native';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -12,15 +12,49 @@ import CustomAlert from '../components/CustomAlert';
 import { LinearGradient } from 'expo-linear-gradient';
 import ScrollToTopButton from '../components/ScrollToTopButton';
 import useScrollToTop from '../hooks/useScrollToTop';
+import { Image } from 'expo-image';
+import * as Clipboard from 'expo-clipboard';
 
-const { width } = Dimensions.get('window');
+const getAvatarBg = (id: string) => {
+  const colors = [
+    '#ec4899', // rose-500
+    '#8b5cf6', // violet-500
+    '#3b82f6', // blue-500
+    '#10b981', // emerald-500
+    '#f59e0b', // amber-500
+    '#ef4444', // red-500
+    '#6366f1', // indigo-500
+    '#d946ef', // fuchsia-500
+  ];
+  if (!id) return colors[0];
+  let hash = 0;
+  for (let i = 0; i < id.length; i++) {
+    hash = id.charCodeAt(i) + ((hash << 5) - hash);
+  }
+  return colors[Math.abs(hash) % colors.length];
+};
 
-export default function StreamingScreen() {
+export default function StreamingScreen({ route }: any) {
   const insets = useSafeAreaInsets();
   const { themeColor } = useTheme();
   const { t } = useTranslation();
   
+  const params = route?.params;
+  const streamUrlFromParams = params?.streamUrl || '';
+  const titleFromParams = params?.title || '';
+  const movieIdFromParams = params?.movieId || '';
+  const posterFromParams = params?.poster || '';
+  const audioFromParams = params?.audio || '';
+  const isTVFromParams = params?.isTV || false;
+  const seasonFromParams = params?.season || '';
+  const episodeFromParams = params?.episode || '';
+
   const [roomIdInput, setRoomIdInput] = useState('');
+  const [creatingRoom, setCreatingRoom] = useState(false);
+  const [createdRoom, setCreatedRoom] = useState<{ roomId: string; title: string; streamUrl: string; hostName: string } | null>(null);
+  const [duplicateRoomId, setDuplicateRoomId] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [copied, setCopied] = useState(false);
   
   const navigation = useNavigation<NativeStackNavigationProp<any>>();
 
@@ -30,14 +64,103 @@ export default function StreamingScreen() {
 
   const [activeRooms, setActiveRooms] = useState<any[]>([]);
   const [loadingRooms, setLoadingRooms] = useState(true);
+  const [maxRooms, setMaxRooms] = useState(30);
   const { user } = useAuth();
   const scrollRef = useRef<FlatList>(null);
   const { handleScroll, showScrollTop } = useScrollToTop();
+
+  const handleResetParams = () => {
+    navigation.setParams({
+      streamUrl: undefined,
+      title: undefined,
+      movieId: undefined,
+      poster: undefined,
+      audio: undefined,
+      isTV: undefined,
+      season: undefined,
+      episode: undefined
+    });
+    setCreatedRoom(null);
+    setDuplicateRoomId(null);
+    setError(null);
+  };
+
+  const handleCreateRoom = async () => {
+    if (!user) {
+      setAlertInfo({
+        visible: true,
+        title: t('streaming.signinRequired'),
+        message: t('streaming.signinDesc'),
+        isError: true,
+        onConfirm: () => {
+          setAlertInfo(prev => ({ ...prev, visible: false }));
+          navigation.navigate('Profile', { screen: 'ProfileScreen' });
+        }
+      });
+      return;
+    }
+    
+    setCreatingRoom(true);
+    setError(null);
+    setDuplicateRoomId(null);
+
+    try {
+      const res = await roomApi.createRoom(
+        titleFromParams,
+        streamUrlFromParams,
+        movieIdFromParams,
+        audioFromParams
+      );
+
+      if (res && res.room_id) {
+        setCreatedRoom({
+          roomId: res.room_id,
+          title: titleFromParams,
+          streamUrl: streamUrlFromParams,
+          hostName: user?.name || 'Host'
+        });
+        await fetchRooms();
+      } else {
+        setError(t('streaming.cannotCreateRoom'));
+      }
+    } catch (err: any) {
+      const data = err.response?.data;
+      if (data?.code === 'DUPLICATE_ROOM' || data?.existing_room_id) {
+        setDuplicateRoomId(data.existing_room_id);
+        setError(data.error || t('streaming.duplicateRoomError'));
+      } else {
+        setError(data?.message || data?.error || t('streaming.cannotCreateRoom'));
+      }
+    } finally {
+      setCreatingRoom(false);
+    }
+  };
+
+  const handleGoToRoom = () => {
+    if (createdRoom) {
+      navigation.navigate('StreamingRoomScreen', {
+        roomId: createdRoom.roomId,
+        initialStreamUrl: createdRoom.streamUrl,
+        initialTitle: createdRoom.title,
+        isHost: true
+      });
+      handleResetParams();
+    }
+  };
+
+  const handleCopyInvite = async () => {
+    if (createdRoom) {
+      await Clipboard.setStringAsync(createdRoom.roomId);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    }
+  };
 
   const fetchRooms = async () => {
     try {
       const res = await roomApi.getActiveRooms();
       if (res.rooms) setActiveRooms(res.rooms);
+      if (res.max_rooms) setMaxRooms(res.max_rooms);
     } catch (e) {
       // ignore
     } finally {
@@ -136,7 +259,12 @@ export default function StreamingScreen() {
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>NTN Streaming</Text>
+        {!!streamUrlFromParams && (
+          <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtnHeader}>
+            <Ionicons name="arrow-back" size={24} color="white" />
+          </TouchableOpacity>
+        )}
+        <Text style={styles.headerTitle}>Streaming</Text>
       </View>
 
       <Animated.FlatList 
@@ -166,59 +294,234 @@ export default function StreamingScreen() {
              </View>
 
              <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ width: '100%', marginBottom: 20 }}>
-               
-               <TouchableOpacity 
-                 style={[styles.createRoomHelpBtn, { backgroundColor: `${themeColor}22`, borderColor: themeColor }]}
-                 onPress={() => {
-                   setAlertInfo({
-                     visible: true,
-                     title: t('streaming.howToCreateRoom'),
-                     message: t('streaming.createRoomGuide'),
-                     isError: false,
-                     onConfirm: undefined
-                   });
-                 }}
-               >
-                 <Ionicons name="add-circle" size={20} color={themeColor} />
-                 <Text style={[styles.createRoomHelpText, { color: themeColor }]}>{t('streaming.createRoom')}</Text>
-                 <Ionicons name="information-circle-outline" size={18} color={themeColor} style={{ marginLeft: 'auto' }} />
-               </TouchableOpacity>
+               {streamUrlFromParams ? (
+                 <LinearGradient colors={['#1e1e2d', '#15151e']} start={{x:0, y:0}} end={{x:1, y:1}} style={styles.createPanel}>
+                   <View style={styles.createPanelHeader}>
+                     <Text style={styles.createPanelTitle}>
+                       {createdRoom ? t('streaming.roomCreatedSuccessfully') : t('streaming.createWatchParty')}
+                     </Text>
+                     <TouchableOpacity onPress={handleResetParams} style={styles.closePanelBtn}>
+                       <Ionicons name="close" size={20} color="#888" />
+                     </TouchableOpacity>
+                   </View>
 
-               <LinearGradient colors={['#1e1e2d', '#15151e']} start={{x:0, y:0}} end={{x:1, y:1}} style={styles.featureBox}>
-                 <Text style={styles.featureTextJoin}>{t('streaming.joinExisting')}</Text>
-                 <View style={styles.inputRow}>
-                    <TextInput 
-                       style={styles.roomInput} 
-                       placeholder={t('streaming.enterRoomId')} 
-                       placeholderTextColor="#666"
-                       value={roomIdInput}
-                       onChangeText={setRoomIdInput}
-                       autoCapitalize="characters"
-                    />
-                    <TouchableOpacity 
-                      style={[styles.joinBtn, { backgroundColor: roomIdInput.trim() ? themeColor : '#333' }]}
-                      disabled={!roomIdInput.trim()}
-                      onPress={() => {
-                         if (roomIdInput.trim() && navigation) {
-                            navigation.navigate('StreamingRoomScreen', {
-                               roomId: roomIdInput.trim().toUpperCase(),
-                               initialStreamUrl: '',
-                               initialTitle: t('streaming.joinRoom'),
+                   {createdRoom ? (
+                     <View style={styles.successContainer}>
+                       <View style={styles.successIconWrapper}>
+                         <Ionicons name="checkmark-circle" size={48} color="#10b981" />
+                       </View>
+                       
+                       <View style={styles.roomDetailsBox}>
+                         <View style={styles.detailRow}>
+                           <Text style={styles.detailLabel}>ID:</Text>
+                           <Text style={styles.detailValueCode}>{createdRoom.roomId}</Text>
+                         </View>
+                         <View style={styles.detailRow}>
+                           <Text style={styles.detailLabel}>{t('streaming.host')}:</Text>
+                           <Text style={styles.detailValue}>{createdRoom.hostName}</Text>
+                         </View>
+                         <View style={styles.detailRow}>
+                           <Text style={styles.detailLabel}>{t('streaming.movie')}:</Text>
+                           <Text style={styles.detailValue} numberOfLines={1}>{createdRoom.title}</Text>
+                         </View>
+                         <View style={styles.detailRow}>
+                           <Text style={styles.detailLabel}>{t('streaming.status')}:</Text>
+                           <Text style={[styles.detailValue, { color: '#3b82f6' }]}>{t('streaming.waiting')}</Text>
+                         </View>
+                         <View style={styles.detailRow}>
+                           <Text style={styles.detailLabel}>{t('streaming.expires')}:</Text>
+                           <Text style={styles.detailValue}>{t('streaming.expiresIn6Hours')}</Text>
+                         </View>
+                       </View>
+
+                       <View style={styles.successActions}>
+                         <TouchableOpacity 
+                           style={[styles.actionBtnPrimary, { backgroundColor: themeColor }]} 
+                           onPress={handleGoToRoom}
+                         >
+                           <Ionicons name="videocam" size={18} color="white" style={{ marginRight: 6 }} />
+                           <Text style={styles.actionBtnText}>{t('streaming.enterRoom')}</Text>
+                         </TouchableOpacity>
+                         
+                         <TouchableOpacity 
+                           style={styles.actionBtnSecondary} 
+                           onPress={handleCopyInvite}
+                         >
+                           <Ionicons name={copied ? "checkmark" : "copy-outline"} size={18} color={copied ? "#10b981" : "white"} style={{ marginRight: 6 }} />
+                           <Text style={[styles.actionBtnTextSecondary, copied ? { color: '#10b981' } : {}]}>
+                             {copied ? t('streaming.copied') : t('streaming.copyInvite')}
+                           </Text>
+                         </TouchableOpacity>
+                       </View>
+                     </View>
+                   ) : (
+                     <View style={styles.formContainer}>
+                       <View style={styles.mediaInfoRow}>
+                         {posterFromParams ? (
+                           <Image source={{ uri: posterFromParams }} style={styles.mediaPoster} contentFit="cover" />
+                         ) : (
+                           <View style={styles.mediaPosterFallback}>
+                             <Ionicons name="film" size={24} color="#555" />
+                           </View>
+                         )}
+                         
+                         <View style={styles.mediaTextWrapper}>
+                           <Text style={styles.mediaTitle} numberOfLines={2}>{titleFromParams}</Text>
+                           <View style={styles.badgesRow}>
+                             <View style={styles.badgeTV}>
+                               <Text style={styles.badgeTextTV}>{isTVFromParams ? 'TV Show' : 'Movie'}</Text>
+                             </View>
+                             {audioFromParams ? (
+                               <View style={[styles.badgeAudio, { backgroundColor: '#f43f5e' }]}>
+                                 <Text style={styles.badgeTextAudio}>{audioFromParams.toUpperCase()}</Text>
+                               </View>
+                             ) : null}
+                           </View>
+                         </View>
+                       </View>
+
+                       {error ? (
+                         <View style={styles.errorBox}>
+                           <Ionicons name="alert-circle" size={16} color="#ef4444" style={{ marginRight: 6 }} />
+                           <Text style={styles.errorText} numberOfLines={3}>{error}</Text>
+                         </View>
+                       ) : null}
+
+                       {duplicateRoomId ? (
+                         <TouchableOpacity 
+                           style={styles.duplicateBtn} 
+                           onPress={() => {
+                             navigation.navigate('StreamingRoomScreen', {
+                               roomId: duplicateRoomId,
+                               initialStreamUrl: streamUrlFromParams,
+                               initialTitle: titleFromParams,
                                isHost: false
-                            });
-                         }
-                      }}
-                    >
-                      <Text style={styles.joinBtnText}>{t('streaming.join')}</Text>
-                      <Ionicons name="arrow-forward" size={16} color="white" />
-                    </TouchableOpacity>
-                 </View>
-               </LinearGradient>
-             </KeyboardAvoidingView>
+                             });
+                           }}
+                         >
+                           <Ionicons name="arrow-forward-circle" size={18} color="white" style={{ marginRight: 6 }} />
+                           <Text style={styles.duplicateBtnText}>
+                             {t('streaming.goToExistingRoom')} ({duplicateRoomId})
+                           </Text>
+                         </TouchableOpacity>
+                       ) : (
+                         <TouchableOpacity 
+                           style={[styles.createBtnSubmit, { backgroundColor: themeColor }]} 
+                           onPress={handleCreateRoom}
+                           disabled={creatingRoom}
+                         >
+                           {creatingRoom ? (
+                             <ActivityIndicator size="small" color="white" />
+                           ) : (
+                             <>
+                               <Ionicons name="add-circle" size={20} color="white" style={{ marginRight: 6 }} />
+                               <Text style={styles.createBtnSubmitText}>
+                                 {t('streaming.createWatchParty')}
+                               </Text>
+                             </>
+                           )}
+                         </TouchableOpacity>
+                       )}
+                     </View>
+                   )}
+                 </LinearGradient>
+               ) : (
+                 <>
+                   <TouchableOpacity 
+                     style={[styles.createRoomHelpBtn, { backgroundColor: `${themeColor}22`, borderColor: themeColor }]}
+                     onPress={() => {
+                       setAlertInfo({
+                         visible: true,
+                         title: t('streaming.howToCreateRoom'),
+                         message: t('streaming.createRoomGuide'),
+                         isError: false,
+                         onConfirm: undefined
+                       });
+                     }}
+                   >
+                     <Ionicons name="add-circle" size={20} color={themeColor} />
+                     <Text style={[styles.createRoomHelpText, { color: themeColor }]}>{t('streaming.createRoom')}</Text>
+                     <Ionicons name="information-circle-outline" size={18} color={themeColor} style={{ marginLeft: 'auto' }} />
+                   </TouchableOpacity>
 
-             <View style={styles.roomsContainerHeader}>
-               <Text style={styles.roomsHeader}>{t('streaming.activeRooms')}</Text>
-             </View>
+                   <LinearGradient colors={['#1e1e2d', '#15151e']} start={{x:0, y:0}} end={{x:1, y:1}} style={styles.featureBox}>
+                     <Text style={styles.featureTextJoin}>{t('streaming.joinExisting')}</Text>
+                     <View style={styles.inputRow}>
+                        <TextInput 
+                           style={styles.roomInput} 
+                           placeholder={t('streaming.enterRoomId')} 
+                           placeholderTextColor="#666"
+                           value={roomIdInput}
+                           onChangeText={setRoomIdInput}
+                           autoCapitalize="characters"
+                        />
+                        <TouchableOpacity 
+                          style={[styles.joinBtn, { backgroundColor: roomIdInput.trim() ? themeColor : '#333' }]}
+                          disabled={!roomIdInput.trim()}
+                          onPress={() => {
+                             if (roomIdInput.trim() && navigation) {
+                                navigation.navigate('StreamingRoomScreen', {
+                                   roomId: roomIdInput.trim().toUpperCase(),
+                                   initialStreamUrl: '',
+                                   initialTitle: t('streaming.joinRoom'),
+                                   isHost: false
+                                });
+                             }
+                          }}
+                        >
+                          <Text style={styles.joinBtnText}>{t('streaming.join')}</Text>
+                          <Ionicons name="arrow-forward" size={16} color="white" />
+                        </TouchableOpacity>
+                      </View>
+                    </LinearGradient>
+                  </>
+                )}
+              </KeyboardAvoidingView>
+
+              <View style={styles.roomsContainerHeader}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                  <Text style={styles.roomsHeader}>{t('streaming.activeRooms')}</Text>
+                  <View style={{ 
+                    backgroundColor: '#fbbf24', 
+                    paddingHorizontal: 8, 
+                    paddingVertical: 2, 
+                    borderRadius: 12,
+                    justifyContent: 'center',
+                    alignItems: 'center',
+                  }}>
+                    <Text style={{ color: '#000', fontSize: 11, fontWeight: 'bold' }}>
+                      {activeRooms.length}/{maxRooms}
+                    </Text>
+                  </View>
+                </View>
+                <TouchableOpacity 
+                  onPress={() => {
+                    setLoadingRooms(true);
+                    fetchRooms();
+                  }}
+                  disabled={loadingRooms}
+                  style={{ 
+                    padding: 8, 
+                    borderRadius: 20, 
+                    backgroundColor: 'rgba(255,255,255,0.06)', 
+                    borderWidth: 1, 
+                    borderColor: 'rgba(255,255,255,0.04)',
+                    justifyContent: 'center',
+                    alignItems: 'center',
+                  }}
+                  hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                >
+                  {loadingRooms ? (
+                    <ActivityIndicator size="small" color="#aaa" style={{ width: 16, height: 16 }} />
+                  ) : (
+                    <Ionicons 
+                      name="refresh" 
+                      size={16} 
+                      color="white" 
+                    />
+                  )}
+                </TouchableOpacity>
+              </View>
            </View>
          }
          ListEmptyComponent={
@@ -228,45 +531,105 @@ export default function StreamingScreen() {
              </Text>
            </View>
          }
-         renderItem={({ item: room }: any) => (
-           <TouchableOpacity 
-             style={[styles.roomCard, { width: '100%' }]}
-             onPress={() => {
-                navigation.navigate('StreamingRoomScreen', {
-                   roomId: room.room_id,
-                   initialStreamUrl: '',
-                   initialTitle: room.title || t('streaming.watchParty'),
-                   isHost: false
-                });
-             }}
-           >
-             <View style={styles.roomCardHeader}>
-                <Text style={styles.roomCardTitle} numberOfLines={1}>{room.title || t('streaming.untitledRoom')}</Text>
-                <View style={styles.roomCardBadge}>
-                   <Text style={styles.roomCardBadgeText}>{room.status}</Text>
+         renderItem={({ item: room }: any) => {
+            const memberCount = typeof room.member_count === 'number' ? room.member_count : 0;
+            const maxUsers = room.max_users || 2;
+            
+            const formatTimeLeft = (ttlSeconds: number) => {
+              if (!ttlSeconds || ttlSeconds <= 0) return '';
+              const h = Math.floor(ttlSeconds / 3600);
+              const m = Math.floor((ttlSeconds % 3600) / 60);
+              if (h > 0) return `${h}h ${m}m`;
+              return `${m}m`;
+            };
+            
+            const timeLeft = formatTimeLeft(room.ttl_seconds);
+
+            const isTV = room.title?.toLowerCase().includes('tập') || 
+                         room.title?.toLowerCase().includes('episode') || 
+                         room.title?.toLowerCase().includes('season') || 
+                         room.title?.toLowerCase().includes('ss');
+
+            return (
+              <TouchableOpacity 
+                style={[styles.roomCard, { width: '100%' }]}
+                onPress={() => {
+                   navigation.navigate('StreamingRoomScreen', {
+                      roomId: room.room_id,
+                      initialStreamUrl: '',
+                      initialTitle: room.title || t('streaming.watchParty'),
+                      isHost: false
+                   });
+                }}
+              >
+                <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                  {room.host_avatar ? (
+                    <Image 
+                      source={{ uri: room.host_avatar }} 
+                      style={styles.hostAvatar} 
+                      contentFit="cover"
+                    />
+                  ) : (
+                    <View style={[styles.hostAvatar, styles.hostAvatarPlaceholder, { backgroundColor: getAvatarBg(room.host_id) }]}>
+                      <Text style={styles.hostAvatarText}>
+                        {room.host_name?.charAt(0)?.toUpperCase() || '?'}
+                      </Text>
+                    </View>
+                  )}
+
+                  <View style={{ flex: 1, marginLeft: 12 }}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 6, marginBottom: 4 }}>
+                      <Text style={styles.roomCardId}>#{room.room_id}</Text>
+                      
+                      <View style={[styles.typeBadge, { backgroundColor: isTV ? 'rgba(59,130,246,0.15)' : 'rgba(168,85,247,0.15)' }]}>
+                        <Text style={[styles.typeBadgeText, { color: isTV ? '#60a5fa' : '#c084fc' }]}>
+                          {isTV ? '📺 PHIM BỘ' : '🎬 PHIM'}
+                        </Text>
+                      </View>
+
+                      <View style={[styles.statusBadge, { backgroundColor: room.status === 'PLAYING' ? 'rgba(16,185,129,0.15)' : 'rgba(245,158,11,0.15)' }]}>
+                        <Text style={[styles.statusBadgeText, { color: room.status === 'PLAYING' ? '#34d399' : '#fbbf24' }]}>
+                          {t('streaming.' + room.status.toLowerCase(), { defaultValue: room.status })}
+                        </Text>
+                      </View>
+                    </View>
+
+                    <Text style={styles.roomCardTitle} numberOfLines={1}>
+                      {room.title || t('streaming.untitledRoom')}
+                    </Text>
+
+                    <View style={{ flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 10, marginTop: 4 }}>
+                      <Text style={styles.roomMetadataText}>
+                        {t('streaming.host')}: {room.host_name || 'Host'}
+                      </Text>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3 }}>
+                        <Ionicons name="people" size={12} color="#888" />
+                        <Text style={styles.roomMetadataText}>{memberCount}/{maxUsers}</Text>
+                      </View>
+                      {!!timeLeft && (
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3 }}>
+                          <Ionicons name="time-outline" size={12} color="#888" />
+                          <Text style={styles.roomMetadataText}>{timeLeft}</Text>
+                        </View>
+                      )}
+                    </View>
+                  </View>
+
+                  {user && (user._id === room.host_id || user.id === room.host_id) && (
+                    <View style={{ marginLeft: 8, justifyContent: 'center', alignItems: 'center' }}>
+                      <TouchableOpacity 
+                         style={{ padding: 8, backgroundColor: 'rgba(255,68,68,0.1)', borderRadius: 8 }}
+                         onPress={(e) => { e.stopPropagation(); handleDeleteRoom(room.room_id); }}
+                         hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                      >
+                         <Ionicons name="trash-outline" size={18} color="#ef4444" />
+                      </TouchableOpacity>
+                    </View>
+                  )}
                 </View>
-                {user && (user._id === room.host_id || user.id === room.host_id) && (
-                   <TouchableOpacity 
-                      style={styles.deleteBtnContainer}
-                      onPress={(e) => { e.stopPropagation(); handleDeleteRoom(room.room_id); }}
-                      hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-                   >
-                      <Ionicons name="trash-outline" size={16} color="#ff4444" />
-                   </TouchableOpacity>
-                )}
-             </View>
-             <View style={styles.roomCardFooter}>
-                <View style={styles.roomCardHost}>
-                   <Ionicons name="person-circle" size={18} color="#aaa" />
-                   <Text style={styles.roomCardHostText}>{room.host_name || t('streaming.host')}</Text>
-                </View>
-                <View style={styles.roomCardUsers}>
-                   <Ionicons name="people" size={16} color="#aaa" />
-                   <Text style={styles.roomCardUsersText}>{room.member_count}/{room.max_users}</Text>
-                </View>
-             </View>
-           </TouchableOpacity>
-         )}
+              </TouchableOpacity>
+            );
+          }}
       />
 
       <ScrollToTopButton
@@ -293,6 +656,8 @@ const styles = StyleSheet.create({
     backgroundColor: '#0f0f13',
   },
   header: {
+    flexDirection: 'row',
+    alignItems: 'center',
     paddingHorizontal: 20,
     paddingBottom: 15,
   },
@@ -300,6 +665,7 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 28,
     fontWeight: 'bold',
+    flex: 1,
   },
   scrollContent: {
     flexGrow: 1,
@@ -415,12 +781,16 @@ const styles = StyleSheet.create({
   roomsContainerHeader: {
     width: '100%',
     marginTop: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 12,
+    paddingRight: 5,
   },
   roomsHeader: {
     color: '#fff',
     fontSize: 17,
     fontWeight: 'bold',
-    marginBottom: 12,
     paddingHorizontal: 5,
   },
   emptyText: {
@@ -493,5 +863,263 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255,68,68,0.1)', 
     justifyContent: 'center', 
     alignItems: 'center' 
-  }
+  },
+  createPanel: {
+    width: '100%',
+    borderRadius: 16,
+    padding: 18,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.08)',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 10,
+    elevation: 5,
+    marginBottom: 20,
+  },
+  createPanelHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 15,
+  },
+  createPanelTitle: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+  closePanelBtn: {
+    padding: 4,
+  },
+  formContainer: {
+    width: '100%',
+  },
+  mediaInfoRow: {
+    flexDirection: 'row',
+    gap: 12,
+    marginBottom: 15,
+    backgroundColor: 'rgba(0,0,0,0.2)',
+    padding: 10,
+    borderRadius: 10,
+  },
+  mediaPoster: {
+    width: 60,
+    height: 90,
+    borderRadius: 8,
+    backgroundColor: '#333',
+  },
+  mediaPosterFallback: {
+    width: 60,
+    height: 90,
+    borderRadius: 8,
+    backgroundColor: '#222',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  mediaTextWrapper: {
+    flex: 1,
+    justifyContent: 'center',
+  },
+  mediaTitle: {
+    color: '#fff',
+    fontSize: 15,
+    fontWeight: 'bold',
+    marginBottom: 8,
+  },
+  badgesRow: {
+    flexDirection: 'row',
+    gap: 6,
+  },
+  badgeTV: {
+    backgroundColor: '#3b82f6',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 4,
+  },
+  badgeTextTV: {
+    color: '#fff',
+    fontSize: 10,
+    fontWeight: 'bold',
+  },
+  badgeAudio: {
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 4,
+  },
+  badgeTextAudio: {
+    color: '#fff',
+    fontSize: 10,
+    fontWeight: 'bold',
+  },
+  createBtnSubmit: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingVertical: 12,
+    borderRadius: 12,
+  },
+  createBtnSubmitText: {
+    color: '#fff',
+    fontSize: 15,
+    fontWeight: 'bold',
+  },
+  errorBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(239,68,68,0.1)',
+    borderWidth: 1,
+    borderColor: 'rgba(239,68,68,0.2)',
+    padding: 10,
+    borderRadius: 10,
+    marginBottom: 15,
+  },
+  errorText: {
+    color: '#ef4444',
+    fontSize: 12,
+    flex: 1,
+  },
+  duplicateBtn: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#f59e0b',
+    paddingVertical: 12,
+    borderRadius: 12,
+  },
+  duplicateBtnText: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: 'bold',
+  },
+  successContainer: {
+    width: '100%',
+    alignItems: 'center',
+  },
+  successIconWrapper: {
+    marginBottom: 15,
+  },
+  roomDetailsBox: {
+    width: '100%',
+    backgroundColor: 'rgba(0,0,0,0.2)',
+    padding: 12,
+    borderRadius: 12,
+    marginBottom: 15,
+    gap: 8,
+  },
+  detailRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  detailLabel: {
+    color: '#888',
+    fontSize: 13,
+  },
+  detailValue: {
+    color: '#fff',
+    fontSize: 13,
+    fontWeight: '600',
+    maxWidth: '70%',
+  },
+  detailValueCode: {
+    color: '#f59e0b',
+    fontSize: 15,
+    fontWeight: 'bold',
+    fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
+  },
+  successActions: {
+    flexDirection: 'row',
+    gap: 10,
+    width: '100%',
+  },
+  actionBtnPrimary: {
+    flex: 1,
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingVertical: 12,
+    borderRadius: 12,
+  },
+  actionBtnText: {
+    color: 'white',
+    fontSize: 14,
+    fontWeight: 'bold',
+  },
+  actionBtnSecondary: {
+    flex: 1,
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#333',
+    borderWidth: 1,
+    borderColor: '#444',
+    paddingVertical: 12,
+    borderRadius: 12,
+  },
+  actionBtnTextSecondary: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: 'bold',
+  },
+  backBtnHeader: {
+    marginRight: 10,
+    padding: 4,
+  },
+  hostAvatar: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: '#222',
+  },
+  hostAvatarPlaceholder: {
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  hostAvatarText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+  roomCardId: {
+    color: '#fbbf24',
+    fontSize: 12,
+    fontWeight: 'bold',
+    fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
+  },
+  typeBadge: {
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
+  },
+  typeBadgeText: {
+    fontSize: 10,
+    fontWeight: 'bold',
+  },
+  statusBadge: {
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
+  },
+  statusBadgeText: {
+    fontSize: 10,
+    fontWeight: 'bold',
+  },
+  deleteBtn: {
+    marginLeft: 6,
+    padding: 2,
+  },
+  roomMetadataText: {
+    color: '#888',
+    fontSize: 12,
+  },
+  joinBtnSmall: {
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 8,
+  },
+  joinBtnSmallText: {
+    color: '#000',
+    fontSize: 13,
+    fontWeight: 'bold',
+  },
 });

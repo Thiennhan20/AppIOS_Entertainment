@@ -123,7 +123,7 @@ export default function GameScreen() {
       scrollEventThrottle={16}
     >
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>NTN Games 🎮</Text>
+        <Text style={styles.headerTitle}>Games 🎮</Text>
         <View style={[styles.scoreBadge, { backgroundColor: `${themeColor}33`, borderColor: themeColor, borderWidth: 1 }]}>
           <Text style={[styles.scoreText, { color: themeColor }]}>🏆 {score}  {t('game.points')}</Text>
         </View>

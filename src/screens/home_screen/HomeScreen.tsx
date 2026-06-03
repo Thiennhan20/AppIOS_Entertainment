@@ -105,6 +105,16 @@ export default function HomeScreen({ navigation }: any) {
   const flatListRef = React.useRef<FlatList>(null);
   const { handleScroll, showScrollTop } = useScrollToTop();
 
+  const onScrollList = (event: any) => {
+    handleScroll(event);
+    const offsetY = event.nativeEvent.contentOffset.y;
+    if (offsetY > 100 && !bottomLoadedRef.current) {
+      bottomLoadedRef.current = true;
+      setBottomLoaded(true);
+      fetchBottomData();
+    }
+  };
+
   const [loading,        setLoading]        = useState(true);
   const [refreshing,     setRefreshing]     = useState(false);
   const [menuVisible,    setMenuVisible]    = useState(false);
@@ -112,6 +122,10 @@ export default function HomeScreen({ navigation }: any) {
   const [activeTrailerKey, setActiveTrailerKey] = useState<string | null>(null);
   const [showTrailer, setShowTrailer] = useState(false);
   const [longPressedMovie, setLongPressedMovie] = useState<any>(null);
+
+  const homeSectionsRef = React.useRef<any>({});
+  const [bottomLoaded, setBottomLoaded] = useState(false);
+  const bottomLoadedRef = React.useRef(false);
 
   // ─── Data Fetching ─────────────────────────────────────────────────────────
   const handleTrailerPress = async (item: any) => {
@@ -151,7 +165,8 @@ export default function HomeScreen({ navigation }: any) {
 
   const fetchData = async () => {
     try {
-      const [movieData, tvData, homeData, regionalData, frameFallbackData] = await Promise.all([
+      // Phase 1: Load top content (Featured, Continue Watching, Watch Parties, Korean, US-UK, China)
+      const [movieData, tvData, homeData, regionalData] = await Promise.all([
         tmdbApi.getTrendingMovies().catch(() => ({ results: [] })),
         tmdbApi.getTrendingTV().catch(() => ({ results: [] })),
         tmdbApi.getHomeBundle().catch(() => ({ sections: {} })),
@@ -160,38 +175,26 @@ export default function HomeScreen({ navigation }: any) {
           tmdbApi.getUSUKContent().catch(() => []),
           tmdbApi.getChinaContent().catch(() => []),
         ]),
-        Promise.all([
-          tmdbApi.getUpcomingContent().catch(() => []),
-          tmdbApi.getAnimeContent().catch(() => []),
-          tmdbApi.getActionContent().catch(() => []),
-          tmdbApi.getHorrorContent().catch(() => []),
-          tmdbApi.getRomanceContent().catch(() => []),
-        ]),
+        fetchUserData(),
+        fetchRoomsData(),
       ]);
+
       const homeSections = (homeData as any)?.sections || {};
+      homeSectionsRef.current = homeSections;
+
       const [fallbackKorean, fallbackUSUK, fallbackChina] = regionalData as any[];
-      const [fallbackUpcoming, fallbackAnime, fallbackAction, fallbackHorror, fallbackRomance] = frameFallbackData as any[];
       const featuredMovies = (movieData as any)?.results || [];
       const featuredTV = (tvData as any)?.results || [];
       const movies = homeSections.trendingMovies?.length ? homeSections.trendingMovies : featuredMovies;
       const tv = homeSections.trendingTV?.length ? homeSections.trendingTV : featuredTV;
-      const actorData = homeSections.actors?.length
-        ? homeSections.actors
-        : await tmdbApi.getFeaturedActorsFromContent([...movies.slice(0, 3), ...tv.slice(0, 2)]).catch(() => []);
       
       setTrendingMovies(movies);
       setTrendingTV(tv);
-      setUpcoming(homeSections.comingSoon?.length ? homeSections.comingSoon : fallbackUpcoming);
-      setActionMovies(homeSections.action?.length ? homeSections.action : fallbackAction);
-      setAnime(homeSections.anime?.length ? homeSections.anime : fallbackAnime);
-      setHorrorMovies(homeSections.horror?.length ? homeSections.horror : fallbackHorror);
-      setRomanceMovies(homeSections.romance?.length ? homeSections.romance : fallbackRomance);
       setKoreanItems(homeSections.korean?.length ? homeSections.korean : fallbackKorean);
       setUsukItems(homeSections.usuk?.length ? homeSections.usuk : fallbackUSUK);
       setChinaItems(homeSections.china?.length ? homeSections.china : fallbackChina);
-      setTopMoviesToday(homeSections.topMovies?.length ? homeSections.topMovies : featuredMovies.slice(0, 5));
-      setTopTVToday(homeSections.topTVShows?.length ? homeSections.topTVShows : featuredTV.slice(0, 5));
-      setFeaturedActors(actorData);
+      setTopMoviesToday(homeSections.topMovies?.length ? homeSections.topMovies.slice(0, 5) : featuredMovies.slice(0, 5));
+      setTopTVToday(homeSections.topTVShows?.length ? homeSections.topTVShows.slice(0, 5) : featuredTV.slice(0, 5));
 
       if (featuredMovies.length >= 3 && featuredTV.length >= 2) {
         setFeaturedList([
@@ -211,10 +214,41 @@ export default function HomeScreen({ navigation }: any) {
         ]);
       }
     } catch (e) {
-      // Phase 1 fetch error
+      // Top load error
     } finally {
       setLoading(false);
       setRefreshing(false);
+    }
+  };
+
+  const fetchBottomData = async () => {
+    try {
+      const homeSections = homeSectionsRef.current || {};
+      
+      const frameFallbackData = await Promise.all([
+        tmdbApi.getUpcomingContent().catch(() => []),
+        tmdbApi.getAnimeContent().catch(() => []),
+        tmdbApi.getActionContent().catch(() => []),
+        tmdbApi.getHorrorContent().catch(() => []),
+        tmdbApi.getRomanceContent().catch(() => []),
+      ]);
+      const [fallbackUpcoming, fallbackAnime, fallbackAction, fallbackHorror, fallbackRomance] = frameFallbackData;
+
+      setUpcoming(homeSections.comingSoon?.length ? homeSections.comingSoon : fallbackUpcoming);
+      setAnime(homeSections.anime?.length ? homeSections.anime : fallbackAnime);
+      setActionMovies(homeSections.action?.length ? homeSections.action : fallbackAction);
+      setHorrorMovies(homeSections.horror?.length ? homeSections.horror : fallbackHorror);
+      setRomanceMovies(homeSections.romance?.length ? homeSections.romance : fallbackRomance);
+
+      const actorData = homeSections.actors?.length
+        ? homeSections.actors
+        : await tmdbApi.getFeaturedActorsFromContent([...trendingMovies.slice(0, 3), ...trendingTV.slice(0, 2)]).catch(() => []);
+      setFeaturedActors(actorData);
+
+      // Load comments in the background
+      await fetchCommentsData();
+    } catch (e) {
+      // Bottom load error
     }
   };
 
@@ -286,14 +320,22 @@ export default function HomeScreen({ navigation }: any) {
 
   useEffect(() => {
     fetchData();
-    fetchRoomsData();
-    fetchCommentsData();
+
+    const unsubscribe = navigation.addListener('focus', () => {
+      roomApi.clearPublicRoomsCache();
+      fetchRoomsData();
+    });
 
     const roomsInterval = setInterval(fetchRoomsData, 30000);
-    const recentCommentsInterval = setInterval(fetchRecentCommentsData, 120000);
-    const topCommentsInterval = setInterval(fetchTopCommentsData, 300000);
+    const recentCommentsInterval = setInterval(() => {
+      if (bottomLoadedRef.current) fetchRecentCommentsData();
+    }, 120000);
+    const topCommentsInterval = setInterval(() => {
+      if (bottomLoadedRef.current) fetchTopCommentsData();
+    }, 300000);
 
     return () => {
+      unsubscribe();
       clearInterval(roomsInterval);
       clearInterval(recentCommentsInterval);
       clearInterval(topCommentsInterval);
@@ -319,10 +361,9 @@ export default function HomeScreen({ navigation }: any) {
     tmdbApi.clearCache();
     commentsApi.clearHomeCache();
     roomApi.clearPublicRoomsCache();
+    bottomLoadedRef.current = false;
+    setBottomLoaded(false);
     fetchData(); 
-    fetchUserData();
-    fetchRoomsData();
-    fetchCommentsData();
   };
 
   // ─── Render helpers ────────────────────────────────────────────────────────
@@ -629,7 +670,7 @@ export default function HomeScreen({ navigation }: any) {
       {/* ── Scrollable content ── */}
       <FlatList
         ref={flatListRef}
-        onScroll={handleScroll}
+        onScroll={onScrollList}
         scrollEventThrottle={16}
         data={finalSections}
         keyExtractor={(item) => item.id}

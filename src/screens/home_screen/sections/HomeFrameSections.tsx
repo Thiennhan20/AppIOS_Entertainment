@@ -135,7 +135,8 @@ export function RankedPosterSection({ section, navigation, onLongPressMovie }: S
                   {
                     transform: [
                       { perspective: 800 },
-                      { rotateY: isEven ? '8deg' : '-8deg' }
+                      { rotateY: isEven ? '8deg' : '-8deg' },
+                      { translateX: isEven ? 0 : -12 }
                     ]
                   }
                 ]}>

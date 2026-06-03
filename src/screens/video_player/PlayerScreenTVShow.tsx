@@ -152,8 +152,6 @@ export default function PlayerScreenTVShow({ route, navigation }: any) {
   const [commentsVisible, setCommentsVisible] = useState(false);
   const [comments, setComments] = useState<any[]>([]);
   const [newComment, setNewComment] = useState('');
-  
-  const [creatingRoom, setCreatingRoom] = useState(false);
 
   // ── Auto Next Episode states ──
   const [autoNextEnabled, setAutoNextEnabled] = useState(false);
@@ -166,22 +164,19 @@ export default function PlayerScreenTVShow({ route, navigation }: any) {
       showAlert(t('common.error', { defaultValue: 'Error' }), "No stream URL available.", true);
       return;
     }
-    setCreatingRoom(true);
-    try {
-       const res = await roomApi.createRoom(`${titleState} (S${selectedSeason} E${selectedEpisode})`, streamUrlState);
-       if (res && res.room_id) {
-           navigation.navigate('StreamingRoomScreen', {
-              roomId: res.room_id,
-              initialStreamUrl: streamUrlState,
-              initialTitle: `${titleState} (S${selectedSeason} E${selectedEpisode})`,
-              isHost: true
-           });
-       }
-    } catch (e: any) {
-       showAlert(t('common.error', { defaultValue: 'Error' }), e?.response?.data?.error || 'Unable to create room.', true);
-    } finally {
-       setCreatingRoom(false);
-    }
+    navigation.navigate('StreamingStack', {
+      screen: 'StreamingScreen',
+      params: {
+        streamUrl: streamUrlState,
+        title: `${titleState} (S${selectedSeason} E${selectedEpisode})`,
+        movieId: item.id.toString(),
+        poster: item.poster_path ? `https://image.tmdb.org/t/p/w400${item.poster_path}` : '',
+        audio: selectedAudio,
+        isTV: true,
+        season: selectedSeason,
+        episode: selectedEpisode,
+      }
+    });
   };
 
   const [alertInfo, setAlertInfo] = useState({
@@ -489,18 +484,12 @@ export default function PlayerScreenTVShow({ route, navigation }: any) {
                 <TouchableOpacity 
                   style={[styles.toggleCommentBtn, { flex: 1, backgroundColor: `${themeColor}22` }]} 
                   onPress={handleCreateWatchParty}
-                  disabled={creatingRoom || !streamUrlState}
+                  disabled={!streamUrlState}
                 >
-                  {creatingRoom ? (
-                    <ActivityIndicator size="small" color={themeColor} />
-                  ) : (
-                    <>
-                      <Ionicons name="people-outline" size={20} color={themeColor} />
-                      <Text style={[styles.toggleCommentText, { color: themeColor, fontSize: 14 }]}>
-                        {t('watch_party.create', { defaultValue: 'Watch Together' })}
-                      </Text>
-                    </>
-                  )}
+                  <Ionicons name="people-outline" size={20} color={themeColor} />
+                  <Text style={[styles.toggleCommentText, { color: themeColor, fontSize: 14 }]}>
+                    {t('watch_party.create', { defaultValue: 'Watch Together' })}
+                  </Text>
                 </TouchableOpacity>
               )}
               

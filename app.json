@@ -26,11 +26,10 @@
     "android": {
       "package": "com.ntn.entertainment",
       "googleServicesFile": "./google-services.json",
-      "usesCleartextTraffic": true,
       "icon": "./assets/icon.png",
       "adaptiveIcon": {
-        "backgroundColor": "#121212",
-        "foregroundImage": "./assets/icon.png"
+        "backgroundColor": "#FFFFFF",
+        "foregroundImage": "./assets/adaptive-icon.png"
       },
       "predictiveBackGestureEnabled": false
     },
@@ -50,7 +49,8 @@
         {
           "photosPermission": "Cho phép truy cập thư viện ảnh để đổi ảnh đại diện"
         }
-      ]
+      ],
+      "expo-localization"
     ],
     "owner": "ngthnhan",
     "runtimeVersion": {

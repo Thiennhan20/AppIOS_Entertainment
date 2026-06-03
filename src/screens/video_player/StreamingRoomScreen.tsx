@@ -15,6 +15,7 @@ import { useWatchPartySocket } from '../../hooks/useWatchPartySocket';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { authApi } from '../../api/authApi';
 import CustomAlert from '../../components/CustomAlert';
+import { roomApi } from '../../api/roomApi';
 
 const { width, height } = Dimensions.get('window');
 
@@ -249,6 +250,7 @@ export default function StreamingRoomScreen({ route, navigation }: any) {
   useEffect(() => {
     return () => {
       ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.PORTRAIT_UP);
+      roomApi.clearPublicRoomsCache();
     };
   }, []);
 

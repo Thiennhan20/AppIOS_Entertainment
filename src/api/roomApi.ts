@@ -17,8 +17,8 @@ apiClient.interceptors.request.use(async (config) => {
 });
 
 export const roomApi = {
-  createRoom: async (title: string, stream_url: string) => {
-    const response = await apiClient.post('/', { title, stream_url });
+  createRoom: async (title: string, stream_url: string, movie_id?: string, audio?: string) => {
+    const response = await apiClient.post('/', { title, stream_url, movie_id, audio });
     return response.data;
   },
   

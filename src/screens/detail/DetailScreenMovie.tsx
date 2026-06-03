@@ -1,14 +1,14 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { 
   StyleSheet, Text, View, ScrollView, FlatList,
-  TouchableOpacity, Dimensions, ActivityIndicator, Modal, Alert
+  TouchableOpacity, Dimensions, ActivityIndicator, Modal, Alert,
+  KeyboardAvoidingView, Platform
 } from 'react-native';
 import YoutubePlayer from 'react-native-youtube-iframe';
 import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
-
 import { tmdbApi } from '../../api/tmdb';
 import { chatAIApi } from '../../api/chatAI';
 import { authApi } from '../../api/authApi';
@@ -249,7 +249,10 @@ export default function DetailScreenMovie({ route, navigation }: any) {
     : (posterUri ? `https://image.tmdb.org/t/p/w400${posterUri}` : 'https://via.placeholder.com/400x600');
 
   return (
-    <View style={styles.container}>
+    <KeyboardAvoidingView 
+      style={styles.container}
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+    >
       <ScrollView
         ref={scrollRef}
         onScroll={handleScroll}
@@ -544,7 +547,7 @@ export default function DetailScreenMovie({ route, navigation }: any) {
         visible={showScrollTop} 
         onPress={() => scrollRef.current?.scrollTo({ y: 0, animated: true })}
       />
-    </View>
+    </KeyboardAvoidingView>
   );
 }
 
