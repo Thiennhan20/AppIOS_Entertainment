@@ -19,7 +19,8 @@
         "ITSAppUsesNonExemptEncryption": false,
         "NSAppTransportSecurity": {
           "NSAllowsArbitraryLoads": true
-        }
+        },
+        "NSPhotoLibraryUsageDescription": "Cho phép truy cập thư viện ảnh để đổi ảnh đại diện"
       }
     },
     "android": {
@@ -43,7 +44,13 @@
     },
     "plugins": [
       "expo-font",
-      "expo-web-browser"
+      "expo-web-browser",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Cho phép truy cập thư viện ảnh để đổi ảnh đại diện"
+        }
+      ]
     ],
     "owner": "ngthnhan",
     "runtimeVersion": {

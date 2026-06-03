@@ -52,7 +52,6 @@ export async function registerForPushNotificationsAsync(): Promise<string | null
     });
 
     const token = tokenData.data;
-    console.log('[Push] Expo Push Token:', token);
 
     // Android requires a notification channel
     if (Platform.OS === 'android') {
@@ -78,7 +77,6 @@ export async function registerForPushNotificationsAsync(): Promise<string | null
 export async function registerTokenWithServer(token: string): Promise<boolean> {
   try {
     await notificationApi.registerPushToken(token);
-    console.log('[Push] Token registered with server');
     return true;
   } catch (error) {
     console.error('[Push] Failed to register token with server:', error);

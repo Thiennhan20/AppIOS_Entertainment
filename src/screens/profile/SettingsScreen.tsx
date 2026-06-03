@@ -27,6 +27,7 @@ export default function SettingsScreen({ navigation }: any) {
   const [saving, setSaving] = useState(false);
   const [avatarBase64, setAvatarBase64] = useState<string | null>(null);
   const [avatarMenuVisible, setAvatarMenuVisible] = useState(false);
+  const pendingAction = useRef<(() => void) | null>(null);
 
   const [alertConfig, setAlertConfig] = useState({
     visible: false,
@@ -155,7 +156,8 @@ export default function SettingsScreen({ navigation }: any) {
           setAvatarBase64(base64Str);
         }
       }
-    } catch (error) {
+    } catch (error: any) {
+      console.log('Image picker error:', error?.message || error);
       showAlert(t('general.error') || 'Error', t('profile.error_choosing_image') || 'Error choosing image', true);
     }
   };
@@ -246,6 +248,14 @@ export default function SettingsScreen({ navigation }: any) {
         transparent={true}
         animationType="fade"
         onRequestClose={() => setAvatarMenuVisible(false)}
+        onDismiss={() => {
+          if (pendingAction.current) {
+            const action = pendingAction.current;
+            pendingAction.current = null;
+            // Small delay to ensure iOS has fully cleaned up the modal
+            setTimeout(() => action(), 300);
+          }
+        }}
       >
         <TouchableWithoutFeedback onPress={() => setAvatarMenuVisible(false)}>
           <View style={styles.modalOverlay}>
@@ -262,7 +272,13 @@ export default function SettingsScreen({ navigation }: any) {
                   style={styles.bottomSheetItem} 
                   onPress={() => {
                     setAvatarMenuVisible(false);
-                    handleChangeAvatar();
+                    if (Platform.OS === 'ios') {
+                      // iOS: use pendingAction + onDismiss to wait for modal to fully dismiss
+                      pendingAction.current = handleChangeAvatar;
+                    } else {
+                      // Android: onDismiss doesn't fire, so call directly with small delay
+                      setTimeout(() => handleChangeAvatar(), 300);
+                    }
                   }}
                 >
                   <View style={[styles.bottomSheetIconContainer, { backgroundColor: `${themeColor}15` }]}>

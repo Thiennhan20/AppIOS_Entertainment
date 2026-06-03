@@ -1,10 +1,12 @@
 import React, { useCallback, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
+  Modal,
   ScrollView,
   StyleSheet,
   Text,
   TouchableOpacity,
+  TouchableWithoutFeedback,
   View,
 } from 'react-native';
 import { Image } from 'expo-image';
@@ -36,6 +38,7 @@ export default function PublicProfileScreen({ route, navigation }: any) {
   const [loading, setLoading] = useState(true);
   const [acting, setActing] = useState(false);
   const [confirmRemove, setConfirmRemove] = useState(false);
+  const [avatarPreviewVisible, setAvatarPreviewVisible] = useState(false);
   const scrollRef = useRef<ScrollView>(null);
   const { handleScroll, showScrollTop } = useScrollToTop();
   const isSelf = String(currentUser?._id || currentUser?.id || '') === String(userId);
@@ -183,16 +186,21 @@ export default function PublicProfileScreen({ route, navigation }: any) {
                 start={{ x: 0, y: 0 }}
                 style={styles.glowBar}
               />
-              {profile.avatar ? (
-                <Image contentFit="cover" source={{ uri: profile.avatar }} style={[styles.profileAvatar, { borderColor: themeColor }]} />
-              ) : (
-                <LinearGradient
-                  colors={themeGradient as [string, string]}
-                  style={styles.profileAvatarFallback}
-                >
-                  <Text style={styles.profileInitial}>{profile.name?.charAt(0).toUpperCase() || 'U'}</Text>
-                </LinearGradient>
-              )}
+              <TouchableOpacity
+                activeOpacity={0.85}
+                onPress={() => profile.avatar ? setAvatarPreviewVisible(true) : null}
+              >
+                {profile.avatar ? (
+                  <Image contentFit="cover" source={{ uri: profile.avatar }} style={[styles.profileAvatar, { borderColor: themeColor }]} />
+                ) : (
+                  <LinearGradient
+                    colors={themeGradient as [string, string]}
+                    style={styles.profileAvatarFallback}
+                  >
+                    <Text style={styles.profileInitial}>{profile.name?.charAt(0).toUpperCase() || 'U'}</Text>
+                  </LinearGradient>
+                )}
+              </TouchableOpacity>
               <Text style={styles.name}>{profile.name}</Text>
               <View style={styles.memberRow}>
                 <Ionicons color="#858D9B" name="calendar-outline" size={16} />
@@ -251,6 +259,36 @@ export default function PublicProfileScreen({ route, navigation }: any) {
         onPress={() => scrollRef.current?.scrollTo({ animated: true, y: 0 })}
         visible={showScrollTop}
       />
+
+      {/* Avatar Preview Modal */}
+      <Modal
+        visible={avatarPreviewVisible}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setAvatarPreviewVisible(false)}
+      >
+        <TouchableWithoutFeedback onPress={() => setAvatarPreviewVisible(false)}>
+          <View style={styles.previewModalOverlay}>
+            <TouchableWithoutFeedback>
+              <View style={styles.previewModalContainer}>
+                {profile?.avatar && (
+                  <Image 
+                    source={{ uri: profile.avatar }} 
+                    style={[styles.previewAvatarImage, { borderColor: themeColor }]} 
+                    contentFit="contain"
+                  />
+                )}
+                <TouchableOpacity 
+                  style={[styles.previewCloseBtn, { backgroundColor: themeColor }]}
+                  onPress={() => setAvatarPreviewVisible(false)}
+                >
+                  <Ionicons name="close" size={24} color="#fff" />
+                </TouchableOpacity>
+              </View>
+            </TouchableWithoutFeedback>
+          </View>
+        </TouchableWithoutFeedback>
+      </Modal>
 
       <CustomAlert
         cancelText={t('general.cancel')}
@@ -323,4 +361,38 @@ const styles = StyleSheet.create({
   badge: { fontSize: 10, fontWeight: '700', marginTop: 3, textTransform: 'uppercase' },
   notFound: { alignItems: 'center', paddingVertical: 90 },
   notFoundTitle: { color: '#B9C0CA', fontSize: 16, fontWeight: '600', marginTop: 12 },
+  previewModalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.85)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  previewModalContainer: {
+    width: 300,
+    height: 300,
+    justifyContent: 'center',
+    alignItems: 'center',
+    position: 'relative',
+  },
+  previewAvatarImage: {
+    width: 300,
+    height: 300,
+    borderRadius: 24,
+    borderWidth: 3,
+  },
+  previewCloseBtn: {
+    position: 'absolute',
+    top: -64,
+    right: 0,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+    elevation: 5,
+  },
 });

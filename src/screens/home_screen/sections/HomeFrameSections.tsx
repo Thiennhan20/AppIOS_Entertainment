@@ -95,6 +95,10 @@ export function FrameRowSection({ section, navigation, onLongPressMovie }: Secti
 }
 
 export function RankedPosterSection({ section, navigation, onLongPressMovie }: SectionProps) {
+  const CARD_WIDTH = 310;
+  const CARD_MARGIN = 16;
+  const SNAP_INTERVAL = CARD_WIDTH + CARD_MARGIN;
+
   return (
     <View style={styles.frameSection}>
       <SectionHeader label={section.label} accent={section.accent} />
@@ -108,6 +112,9 @@ export function RankedPosterSection({ section, navigation, onLongPressMovie }: S
         maxToRenderPerBatch={5}
         windowSize={7}
         removeClippedSubviews={false}
+        snapToInterval={SNAP_INTERVAL}
+        decelerationRate="fast"
+        snapToAlignment="start"
         renderItem={({ item, index }) => {
           const isTV = isTVItem(item, section.isTV);
           const posterUri = getPosterUri(item, 'w500');
@@ -115,36 +122,39 @@ export function RankedPosterSection({ section, navigation, onLongPressMovie }: S
 
           return (
             <TouchableOpacity
-              style={[styles.rankedCard, { marginRight: isEven ? -52 : 8 }]}
+              style={styles.rankedCard}
               onPress={() => navigation.navigate('DetailScreen', { item, isTV })}
               onLongPress={() => onLongPressMovie?.(item, isTV)}
               delayLongPress={400}
               activeOpacity={0.86}
             >
-              <View style={[
-                styles.rankedPosterShadowContainer,
-                {
-                  transform: [
-                    { perspective: 1000 },
-                    { rotateY: isEven ? '30deg' : '-30deg' }
-                  ]
-                }
-              ]}>
-                <View style={styles.rankedPosterWrap}>
-                  {posterUri ? (
-                    <Image source={{ uri: posterUri }} style={styles.rankedPoster} contentFit="cover" transition={180} cachePolicy="memory-disk" />
-                  ) : (
-                    <View style={[styles.rankedPoster, styles.placeholderCard]}>
-                      <Ionicons name="film-outline" size={30} color="#777" />
-                    </View>
-                  )}
-                  <LinearGradient colors={['transparent', 'rgba(0,0,0,0.75)']} style={styles.framePosterOverlay} />
+              {/* Clip container: absorbs the 3D rotation overflow so visual spacing stays even */}
+              <View style={styles.rankedPosterClip}>
+                <View style={[
+                  styles.rankedPosterShadowContainer,
+                  {
+                    transform: [
+                      { perspective: 800 },
+                      { rotateY: isEven ? '8deg' : '-8deg' }
+                    ]
+                  }
+                ]}>
+                  <View style={styles.rankedPosterWrap}>
+                    {posterUri ? (
+                      <Image source={{ uri: posterUri }} style={styles.rankedPoster} contentFit="cover" transition={180} cachePolicy="memory-disk" />
+                    ) : (
+                      <View style={[styles.rankedPoster, styles.placeholderCard]}>
+                        <Ionicons name="film-outline" size={30} color="#777" />
+                      </View>
+                    )}
+                    <LinearGradient colors={['transparent', 'rgba(0,0,0,0.75)']} style={styles.framePosterOverlay} />
+                  </View>
                 </View>
               </View>
               <View style={styles.rankedInfo}>
                 <Text style={styles.rankedNumber}>{index + 1}</Text>
                 <View style={styles.rankedDivider} />
-                <View style={{ flex: 1 }}>
+                <View style={styles.rankedTextWrap}>
                   <Text style={styles.rankedTitle} numberOfLines={1}>{getTitle(item)}</Text>
                   <Text style={styles.rankedSubtitle} numberOfLines={1}>{getOriginalTitle(item) || getYear(item)}</Text>
                 </View>

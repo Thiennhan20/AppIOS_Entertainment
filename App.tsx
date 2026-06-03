@@ -46,7 +46,10 @@ console.info = (...args) => {
 
 const originalLog = console.log;
 console.log = (...args) => {
-  if (typeof args[0] === 'string' && args[0].includes('i18next is made possible')) return;
+  if (typeof args[0] === 'string' && (
+    args[0].includes('i18next is made possible') ||
+    args[0].includes('VirtualizedList:')
+  )) return;
   originalLog(...args);
 };
 
