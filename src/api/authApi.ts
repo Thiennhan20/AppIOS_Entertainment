@@ -96,6 +96,11 @@ export const authApi = {
     return response.data;
   },
 
+  getRecentlyWatchedPaged: async (page: number, limit: number) => {
+    const response = await apiClient.get(`/recently-watched?page=${page}&limit=${limit}`);
+    return response.data;
+  },
+
   getRecentlyWatchedItem: async (contentId: string, _server: string, _audio: string, isTVShow?: boolean, season?: number, episode?: number) => {
     const params = new URLSearchParams();
     params.append('contentId', contentId.toString());
@@ -113,6 +118,18 @@ export const authApi = {
     if (payload.audio) payload.audio = payload.audio.toLowerCase();
     
     const response = await apiClient.post('/recently-watched', payload);
+    return response.data;
+  },
+
+  deleteRecentlyWatchedItem: async (contentId: string, isTVShow: boolean = false, season?: number | null, episode?: number | null) => {
+    const response = await apiClient.delete('/recently-watched', {
+      data: {
+        contentId,
+        isTVShow,
+        season: isTVShow ? (season ?? null) : null,
+        episode: isTVShow ? (episode ?? null) : null
+      }
+    });
     return response.data;
   },
 

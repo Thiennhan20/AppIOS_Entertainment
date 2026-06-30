@@ -61,33 +61,40 @@ import { AuthProvider, useAuth } from './src/context/AuthContext';
 import { ThemeProvider, useTheme } from './src/context/ThemeContext';
 import { ToastProvider } from './src/context/ToastContext';
 
-import CustomSplashScreen from './src/screens/SplashScreen';
-import HomeScreen from './src/screens/home_screen';
-import DetailScreen from './src/screens/detail/DetailScreen';
-import SearchScreen from './src/screens/SearchScreen';
-import SearchResultScreen from './src/screens/SearchResultScreen';
-import ListScreen from './src/screens/ListScreen';
-import PlayerScreen from './src/screens/video_player/PlayerScreen';
-import StreamingRoomScreen from './src/screens/video_player/StreamingRoomScreen';
-import GameScreen from './src/screens/GameScreen';
-import AIScreen from './src/screens/AIScreen';
-import ProfileScreen from './src/screens/profile/ProfileScreen';
-import StreamingScreen from './src/screens/StreamingScreen';
-import SettingsScreen from './src/screens/profile/SettingsScreen';
-import HelpScreen from './src/screens/profile/HelpScreen';
-import UserListScreen from './src/screens/profile/UserListScreen';
-import UserCommentsScreen from './src/screens/profile/UserCommentsScreen';
-import FriendsScreen from './src/screens/profile/FriendsScreen';
-import PublicProfileScreen from './src/screens/profile/PublicProfileScreen';
-import PersonalDashboardScreen from './src/screens/profile/PersonalDashboardScreen';
+import CustomSplashScreen from './src/mobile/screens/SplashScreen';
+import HomeScreen from './src/mobile/screens/home_screen';
+import DetailScreen from './src/mobile/screens/detail/DetailScreen';
+import SearchScreen from './src/mobile/screens/SearchScreen';
+import SearchResultScreen from './src/mobile/screens/SearchResultScreen';
+import ListScreen from './src/mobile/screens/ListScreen';
+import PlayerScreen from './src/mobile/screens/video_player/PlayerScreen';
+import StreamingRoomScreen from './src/mobile/screens/video_player/StreamingRoomScreen';
+import GameScreen from './src/mobile/screens/GameScreen';
+import AIScreen from './src/mobile/screens/AIScreen';
+import ProfileScreen from './src/mobile/screens/profile/ProfileScreen';
+import StreamingScreen from './src/mobile/screens/StreamingScreen';
+import SettingsScreen from './src/mobile/screens/profile/SettingsScreen';
+import HelpScreen from './src/mobile/screens/profile/HelpScreen';
+import UserListScreen from './src/mobile/screens/profile/UserListScreen';
+import UserCommentsScreen from './src/mobile/screens/profile/UserCommentsScreen';
+import FriendsScreen from './src/mobile/screens/profile/FriendsScreen';
+import PublicProfileScreen from './src/mobile/screens/profile/PublicProfileScreen';
+import PersonalDashboardScreen from './src/mobile/screens/profile/PersonalDashboardScreen';
 
-import LoginScreen from './src/screens/auth/LoginScreen';
-import RegisterScreen from './src/screens/auth/RegisterScreen';
-import ForgotPasswordScreen from './src/screens/auth/ForgotPasswordScreen';
+import LoginScreen from './src/mobile/screens/auth/LoginScreen';
+import RegisterScreen from './src/mobile/screens/auth/RegisterScreen';
+import ForgotPasswordScreen from './src/mobile/screens/auth/ForgotPasswordScreen';
 
-import { AnimatedTabBar } from './src/components/AnimatedTabBar';
-import CinematicEntryTransition from './src/components/CinematicEntryTransition';
-import VersionChecker from './src/components/VersionChecker';
+import { AnimatedTabBar } from './src/mobile/components/AnimatedTabBar';
+import CinematicEntryTransition from './src/mobile/components/CinematicEntryTransition';
+import VersionChecker from './src/mobile/components/VersionChecker';
+import TVAppNavigator from './src/tv/navigation/TVAppNavigator';
+import * as ScreenOrientation from 'expo-screen-orientation';
+import { enableScreens } from 'react-native-screens';
+
+if (Platform.isTV) {
+  enableScreens(false);
+}
 
 const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
@@ -110,6 +117,7 @@ function HomeStack() {
       <Stack.Screen name="StreamingRoomScreen" component={StreamingRoomScreen} />
       <Stack.Screen name="FriendsScreen" component={FriendsScreen} />
       <Stack.Screen name="PublicProfileScreen" component={PublicProfileScreen} />
+      <Stack.Screen name="UserListScreen" component={UserListScreen} />
     </Stack.Navigator>
   );
 }
@@ -214,6 +222,16 @@ function AppNavigator() {
   };
   const showEntryTransition = !!user && entryTransitionId > completedEntryTransitionId;
 
+  if (Platform.isTV) {
+    return (
+      <View style={{ flex: 1, backgroundColor: '#050609' }}>
+        <NavigationContainer theme={navigationTheme}>
+          <TVAppNavigator />
+        </NavigationContainer>
+      </View>
+    );
+  }
+
   return (
     <View style={{ flex: 1, backgroundColor: '#050609' }}>
       <NavigationContainer theme={navigationTheme}>
@@ -232,6 +250,21 @@ function AppNavigator() {
 export default function App() {
   const [showSplash, setShowSplash] = React.useState(true);
   const backgroundTime = React.useRef<number | null>(null);
+
+  React.useEffect(() => {
+    async function lockOrientation() {
+      try {
+        if (Platform.isTV) {
+          await ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.LANDSCAPE);
+        } else {
+          await ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.PORTRAIT_UP);
+        }
+      } catch (err) {
+        // ignore
+      }
+    }
+    lockOrientation();
+  }, []);
 
   React.useEffect(() => {
     const subscription = AppState.addEventListener('change', nextAppState => {

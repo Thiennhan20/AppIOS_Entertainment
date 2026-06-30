@@ -1,6 +1,7 @@
 {
   "general": {
     "home": "Home",
+    "loading": "Loading...",
     "entertainment": "Entertainment",
     "profile": "Profile",
     "ai_hub": "AI Hub",
@@ -56,6 +57,7 @@
     "fresh_comments": "Fresh Comments",
     "upvotes": "Upvotes",
     "trending_movies": "🔥 Trending Movies",
+    "trending_tv": "📺 Trending TV Shows",
     "top_tv_shows": "📺 Top TV Shows",
     "your_watchlist": "🔖 Your Watchlist",
     "action_thriller": "💥 Action & Thriller",
@@ -94,6 +96,7 @@
     "entertainment_title": "🎮 NTN Entertainment Zone",
     "home_cta_title": "Unlock the Best Experience",
     "home_cta_subtitle": "Log in now to save your watch history and unlock the smart NTN AI!",
+    "home_cta_subtitle_tv": "Log in now to save your watch history and sync your watchlist across devices!",
     "movie_label": "Movie",
     "tv_show_label": "TV Show",
     "entertainment_movies": "Movies Hub",
@@ -154,6 +157,10 @@
     "close_comments": "Close Comments",
     "open_comments": "Open Comments",
     "resume_playback": "RESUME PLAYBACK",
+    "continue_watching": "Continue watching?",
+    "saved_progress_msg": "Do you want to continue watching from your saved position?",
+    "continue_label": "Resume",
+    "restart_label": "Start over",
     "you_stopped_at": "You stopped at",
     "minute_short": "m",
     "second_short": "s",
@@ -188,6 +195,11 @@
     "logout": "Logout",
     "logout_confirm": "Are you sure you want to log out?",
     "account_settings": "Account Settings",
+    "user_comments": "Comments",
+    "language_settings": "Language Settings",
+    "language_label": "Language (English)",
+    "manage_preferences_subtitle": "Manage your theme, language preferences and account.",
+    "sign_out_tv": "Sign Out From TV App",
     "my_profile": "My Profile",
     "watchlist": "Watchlist",
     "watch_history": "Watch History",
@@ -235,7 +247,9 @@
     "view_entry": "View {{kind}} on {{media}}",
     "view_liked_entry": "View liked {{kind}} on {{media}}",
     "no_comments_yet": "You haven't posted any comments yet.",
-    "likes_count": "{{count}} likes"
+    "likes_count": "{{count}} likes",
+    "confirm_delete_history_title": "Delete Watch History",
+    "confirm_delete_history_desc": "Are you sure you want to remove this item from your watch history?"
   },
   "friends": {
     "title": "Friends",
@@ -346,7 +360,9 @@
     "signup_failed": "Sign Up failed",
     "create_account": "Create account • Dive into the movie world",
     "recovery_sent": "We have sent a password recovery link to your inbox. Please check your email (including spam folder).",
-    "enter_registered_email": "Enter your registered email. We will send you a link to reset your password."
+    "enter_registered_email": "Enter your registered email. We will send you a link to reset your password.",
+    "profanity_error": "Username contains inappropriate language. Please choose a different name.",
+    "max_length_error": "Username must not exceed 20 characters."
   },
   "streaming": {
     "lobbyTitle": "Streaming Lobby",
@@ -446,5 +462,28 @@
     "genre": "Genre",
     "release_year": "Release Year",
     "country_region": "Country / Region"
+  },
+  "detail": {
+    "no_overview": "No overview available for this content.",
+    "in_watchlist": "In Watchlist",
+    "add_watchlist": "My List",
+    "no_comments": "No comments yet. Write yours on mobile!"
+  },
+  "tv": {
+    "movies": "Movies",
+    "tv_series": "TV Series",
+    "movies_subtitle": "Discover popular and trending feature films.",
+    "tv_series_subtitle": "Discover popular and trending television series.",
+    "no_movies": "No movies found.",
+    "no_tv_shows": "No TV shows found."
+  },
+  "dashboard": {
+    "welcome": "Personal Space",
+    "intro": "Manage your watch lists, interactions, and connections in one custom place.",
+    "explore": "Explore",
+    "saved_subtitle": "Saved movies & shows",
+    "history_subtitle": "Recent viewing activity",
+    "comments_subtitle": "Your thoughts & replies",
+    "friends_subtitle": "Your community hub"
   }
 }

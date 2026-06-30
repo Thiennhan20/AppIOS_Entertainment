@@ -1,6 +1,7 @@
 {
   "general": {
     "home": "Trang chủ",
+    "loading": "Đang tải...",
     "entertainment": "Giải trí",
     "profile": "Hồ sơ",
     "ai_hub": "AI",
@@ -56,6 +57,7 @@
     "fresh_comments": "Vừa Thổi Vừa Đọc (Mới Nhất)",
     "upvotes": "Tán thành",
     "trending_movies": "🔥 Phim Thịnh Hành",
+    "trending_tv": "📺 Phim Bộ Thịnh Hành",
     "top_tv_shows": "📺 TV Shows Đỉnh Cao",
     "your_watchlist": "🔖 Danh Sách Của Bạn",
     "action_thriller": "💥 Hành Động & Kịch Tính",
@@ -94,6 +96,7 @@
     "entertainment_title": "🎮 Khu Vực Giải Trí",
     "home_cta_title": "Trải Nghiệm Trọn Vẹn Hơn",
     "home_cta_subtitle": "Đăng nhập ngay để lưu lại lịch sử xem phim và mở khóa NTN AI thông minh!",
+    "home_cta_subtitle_tv": "Đăng nhập ngay để lưu lại lịch sử xem phim và đồng bộ hóa danh sách của bạn!",
     "movie_label": "Phim Lẻ",
     "tv_show_label": "Phim Bộ",
     "entertainment_movies": "Kho Phim Lẻ",
@@ -154,6 +157,10 @@
     "close_comments": "Đóng Khu Vực Bình Luận",
     "open_comments": "Mở Khu Vực Bình Luận",
     "resume_playback": "TIẾP TỤC XEM",
+    "continue_watching": "Tiếp tục xem?",
+    "saved_progress_msg": "Bạn có muốn tiếp tục xem từ vị trí đã lưu?",
+    "continue_label": "Xem tiếp",
+    "restart_label": "Xem từ đầu",
     "you_stopped_at": "Bạn đã dừng lại ở",
     "minute_short": "p",
     "second_short": "s",
@@ -188,6 +195,11 @@
     "logout": "Đăng xuất",
     "logout_confirm": "Bạn có chắc chắn muốn đăng xuất khỏi NTN không?",
     "account_settings": "Cài đặt tài khoản",
+    "user_comments": "Bình luận",
+    "language_settings": "Cài đặt ngôn ngữ",
+    "language_label": "Ngôn ngữ (Tiếng Việt)",
+    "manage_preferences_subtitle": "Quản lý giao diện, ngôn ngữ và tài khoản của bạn.",
+    "sign_out_tv": "Đăng xuất khỏi ứng dụng TV",
     "my_profile": "Trang cá nhân",
     "watchlist": "Phim đã lưu",
     "watch_history": "Lịch sử xem",
@@ -235,7 +247,9 @@
     "view_entry": "Xem {{kind}} trong {{media}}",
     "view_liked_entry": "Xem {{kind}} đã thích trong {{media}}",
     "no_comments_yet": "Bạn chưa đăng bình luận nào.",
-    "likes_count": "{{count}} lượt thích"
+    "likes_count": "{{count}} lượt thích",
+    "confirm_delete_history_title": "Xóa lịch sử xem",
+    "confirm_delete_history_desc": "Bạn có chắc chắn muốn xóa bộ phim này khỏi lịch sử xem không?"
   },
   "friends": {
     "title": "Bạn bè",
@@ -346,7 +360,9 @@
     "signup_failed": "Đăng Ký thất bại",
     "create_account": "Tạo tài khoản • Cùng đắm chìm vào thế giới phim",
     "recovery_sent": "Chúng tôi đã gửi một liên kết khôi phục mật khẩu vào hòm thư của bạn. Vui lòng kiểm tra email (cả hộp thư rác).",
-    "enter_registered_email": "Nhập email đã đăng ký của bạn. Chúng tôi sẽ gửi cho bạn một liên kết để đặt lại mật khẩu."
+    "enter_registered_email": "Nhập email đã đăng ký của bạn. Chúng tôi sẽ gửi cho bạn một liên kết để đặt lại mật khẩu.",
+    "profanity_error": "Tên người dùng chứa từ ngữ không phù hợp. Vui lòng chọn tên khác.",
+    "max_length_error": "Tên người dùng không được vượt quá 20 ký tự."
   },
   "streaming": {
     "lobbyTitle": "Sảnh Xem Cùng",
@@ -446,5 +462,28 @@
     "genre": "Thể loại",
     "release_year": "Năm Phát hành",
     "country_region": "Quốc gia / Lãnh thổ"
+  },
+  "detail": {
+    "no_overview": "Chưa có thông tin mô tả chi tiết cho nội dung này.",
+    "in_watchlist": "Đã lưu",
+    "add_watchlist": "Danh sách của tôi",
+    "no_comments": "Chưa có bình luận nào. Hãy viết bình luận của bạn trên điện thoại!"
+  },
+  "tv": {
+    "movies": "Phim Lẻ",
+    "tv_series": "Phim Bộ",
+    "movies_subtitle": "Khám phá danh sách phim lẻ, phim chiếu rạp thịnh hành nhất.",
+    "tv_series_subtitle": "Khám phá danh sách phim bộ, phim truyền hình thịnh hành nhất.",
+    "no_movies": "Không tìm thấy phim lẻ nào.",
+    "no_tv_shows": "Không tìm thấy phim bộ nào."
+  },
+  "dashboard": {
+    "welcome": "Không gian cá nhân",
+    "intro": "Quản lý danh sách lưu trữ, lịch sử xem phim và kết nối bạn bè ngay tại đây.",
+    "explore": "Khám phá",
+    "saved_subtitle": "Danh sách phim đã lưu",
+    "history_subtitle": "Lịch sử đã xem gần đây",
+    "comments_subtitle": "Quản lý bình luận & góp ý",
+    "friends_subtitle": "Danh sách bạn bè của bạn"
   }
 }

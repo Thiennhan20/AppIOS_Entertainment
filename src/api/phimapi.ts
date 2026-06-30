@@ -309,9 +309,15 @@ export const phimApi = {
                episodeData = serverGroup.server_data[0];
             }
 
-            let streamUrl = episodeData?.link_embed || episodeData?.link_m3u8;
-            if (streamUrl && streamUrl.includes('?url=')) {
-              streamUrl = streamUrl.split('?url=')[1];
+            let streamUrl = episodeData?.link_m3u8 || episodeData?.link_embed;
+            if (streamUrl) {
+              if (streamUrl.includes('?url=')) {
+                try {
+                  streamUrl = decodeURIComponent(streamUrl.split('?url=')[1]);
+                } catch {
+                  streamUrl = streamUrl.split('?url=')[1];
+                }
+              }
             }
             if (streamUrl) {
               results.push({

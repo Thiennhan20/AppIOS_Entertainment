@@ -174,6 +174,7 @@ export const tmdbApi = {
   getTopRatedMovies: () => fetchWithFallback('/movie/top_rated'),
   getMovieDetail: (id: string | number) => fetchWithFallback(`/movie/${id}`),
   getTVDetail: (id: string | number) => fetchWithFallback(`/tv/${id}`),
+  getTVSeasonDetail: (id: string | number, seasonNumber: number | string) => fetchWithFallback(`/tv/${id}/season/${seasonNumber}`),
   getSimilarMovies: (id: string | number) => fetchWithFallback(`/movie/${id}/similar`),
   getSimilarTV: (id: string | number) => fetchWithFallback(`/tv/${id}/similar`),
   
